@@ -46,22 +46,9 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 	cmdrDir := filepath.Join(dir, "cmdr")
 
 	// Resolve host: positional arg > --host flag > auto-detect
-	var info *host.Info
-	if len(args) > 0 {
-		info, err = host.GetHost(dir, args[0])
-		if err != nil {
-			return fmt.Errorf("host %q not found: %w\n\nRun: unimart deli hosts   to list available hosts", args[0], err)
-		}
-	} else if switchHost != "" {
-		info, err = host.GetHost(dir, switchHost)
-		if err != nil {
-			return fmt.Errorf("host %q not found: %w\n\nRun: unimart deli hosts   to list available hosts", switchHost, err)
-		}
-	} else {
-		info, err = host.Detect(dir)
-		if err != nil {
-			return fmt.Errorf("host auto-detection failed: %w\n\nUse: unimart deli switch <host-name>\nOr:  unimart deli switch --host <host-name>\nRun: unimart deli hosts   to list available hosts", err)
-		}
+	info, err := resolveSwitchHost(dir, args, switchHost)
+	if err != nil {
+		return err
 	}
 	hostName := info.Name
 	hostPlatform := info.Platform
@@ -95,6 +82,42 @@ const (
 	applyModeHomeOnly = "home-only"
 )
 
+// Host lookup seams — swapped in tests.
+var (
+	getHostFn    = host.GetHost
+	detectHostFn = host.Detect
+)
+
+// Exec seams — swapped in tests to record argv instead of running commands.
+var (
+	runVisibleDirFn = platform.RunVisibleDir
+	runVisibleFn    = platform.RunVisible
+	commandExistsFn = platform.CommandExists
+)
+
+// resolveSwitchHost resolves the target host with precedence:
+// positional arg > --host flag > auto-detect.
+func resolveSwitchHost(dir string, args []string, flagHost string) (*host.Info, error) {
+	name := flagHost
+	if len(args) > 0 {
+		name = args[0]
+	}
+
+	if name != "" {
+		info, err := getHostFn(dir, name)
+		if err != nil {
+			return nil, fmt.Errorf("host %q not found: %w\n\nRun: unimart deli hosts   to list available hosts", name, err)
+		}
+		return info, nil
+	}
+
+	info, err := detectHostFn(dir)
+	if err != nil {
+		return nil, fmt.Errorf("host auto-detection failed: %w\n\nUse: unimart deli switch <host-name>\nOr:  unimart deli switch --host <host-name>\nRun: unimart deli hosts   to list available hosts", err)
+	}
+	return info, nil
+}
+
 func selectApplyMode(hostPlatform string, homeOnly bool) (string, error) {
 	if homeOnly {
 		if hostPlatform == "macos" {
@@ -114,9 +137,9 @@ func selectApplyMode(hostPlatform string, homeOnly bool) (string, error) {
 }
 
 func switchDarwin(cmdrDir, flakeRef string) error {
-	if platform.CommandExists("darwin-rebuild") {
+	if commandExistsFn("darwin-rebuild") {
 		fmt.Printf("  Running %s...\n", bold("darwin-rebuild switch"))
-		if err := platform.RunVisibleDir(cmdrDir, "sudo", "darwin-rebuild", "switch", "--flake", flakeRef); err != nil {
+		if err := runVisibleDirFn(cmdrDir, "sudo", "darwin-rebuild", "switch", "--flake", flakeRef); err != nil {
 			return fmt.Errorf("darwin-rebuild switch failed: %w", err)
 		}
 	} else {
@@ -125,13 +148,13 @@ func switchDarwin(cmdrDir, flakeRef string) error {
 		// Move /etc/bashrc if it exists (nix-darwin requirement)
 		if _, err := os.Stat("/etc/bashrc"); err == nil {
 			fmt.Println("  Moving /etc/bashrc to /etc/bashrc.before-nix-darwin...")
-			if err := platform.RunVisible("sudo", "mv", "/etc/bashrc", "/etc/bashrc.before-nix-darwin"); err != nil {
+			if err := runVisibleFn("sudo", "mv", "/etc/bashrc", "/etc/bashrc.before-nix-darwin"); err != nil {
 				return fmt.Errorf("move /etc/bashrc: %w", err)
 			}
 		}
 
 		fmt.Printf("  Running %s (first-time bootstrap)...\n", bold("nix-darwin"))
-		if err := platform.RunVisibleDir(cmdrDir, "sudo", "nix", "run", "nix-darwin/master#darwin-rebuild", "--", "switch", "--flake", flakeRef); err != nil {
+		if err := runVisibleDirFn(cmdrDir, "sudo", "nix", "run", "nix-darwin/master#darwin-rebuild", "--", "switch", "--flake", flakeRef); err != nil {
 			return fmt.Errorf("nix-darwin bootstrap failed: %w", err)
 		}
 	}
@@ -142,7 +165,7 @@ func switchDarwin(cmdrDir, flakeRef string) error {
 
 func switchLinux(cmdrDir, flakeRef string) error {
 	fmt.Printf("  Running %s...\n", bold("home-manager switch"))
-	if err := platform.RunVisibleDir(cmdrDir, "home-manager", "switch", "--flake", flakeRef); err != nil {
+	if err := runVisibleDirFn(cmdrDir, "home-manager", "switch", "--flake", flakeRef); err != nil {
 		return fmt.Errorf("home-manager switch failed: %w", err)
 	}
 
@@ -152,7 +175,7 @@ func switchLinux(cmdrDir, flakeRef string) error {
 
 func switchNixOS(cmdrDir, flakeRef string) error {
 	fmt.Printf("  Running %s...\n", bold("nixos-rebuild switch"))
-	if err := platform.RunVisibleDir(cmdrDir, "sudo", "nixos-rebuild", "switch", "--flake", flakeRef); err != nil {
+	if err := runVisibleDirFn(cmdrDir, "sudo", "nixos-rebuild", "switch", "--flake", flakeRef); err != nil {
 		return fmt.Errorf("nixos-rebuild switch failed: %w", err)
 	}
 
@@ -163,7 +186,7 @@ func switchNixOS(cmdrDir, flakeRef string) error {
 func switchHomeOnlyApply(cmdrDir, hostName string) error {
 	activationRef := fmt.Sprintf(".#homeConfigurations.%s.activationPackage", hostName)
 	fmt.Printf("  Running %s...\n", bold("nix run home activationPackage"))
-	if err := platform.RunVisibleDir(cmdrDir, "nix", "run", activationRef); err != nil {
+	if err := runVisibleDirFn(cmdrDir, "nix", "run", activationRef); err != nil {
 		return fmt.Errorf("home-only apply failed for %s: %w", activationRef, err)
 	}
 

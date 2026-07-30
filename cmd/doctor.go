@@ -60,21 +60,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	hostPlatform := detectedHostPlatform(dir)
-
-	if hostPlatform == "macos" {
-		toolChecks = append(toolChecks,
-			check{"darwin-rebuild", checkExists("darwin-rebuild")},
-			check{"brew", checkCommand("brew", "--version")},
-		)
-	} else if hostPlatform == "nixos" {
-		toolChecks = append(toolChecks,
-			check{"nixos-rebuild", checkExists("nixos-rebuild")},
-		)
-	} else {
-		toolChecks = append(toolChecks,
-			check{"home-manager", checkCommand("home-manager", "--version")},
-		)
-	}
+	toolChecks = append(toolChecks, platformToolChecks(hostPlatform)...)
 
 	toolChecks = append(toolChecks,
 		check{"docker", checkCommand("docker", "--version")},
@@ -102,6 +88,27 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// platformToolChecks returns the platform-specific apply-tool checks:
+// macOS uses darwin-rebuild (+brew), NixOS uses nixos-rebuild, and other
+// Linux distros use standalone home-manager.
+func platformToolChecks(hostPlatform string) []check {
+	switch hostPlatform {
+	case "macos":
+		return []check{
+			{"darwin-rebuild", checkExists("darwin-rebuild")},
+			{"brew", checkCommand("brew", "--version")},
+		}
+	case "nixos":
+		return []check{
+			{"nixos-rebuild", checkExists("nixos-rebuild")},
+		}
+	default:
+		return []check{
+			{"home-manager", checkCommand("home-manager", "--version")},
+		}
+	}
 }
 
 func detectedHostPlatform(orgDir string) string {

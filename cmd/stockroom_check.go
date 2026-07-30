@@ -230,6 +230,10 @@ func parseMakefileTargets(path string) (map[string]bool, error) {
 		line := scanner.Text()
 		// Match lines like "target:" or "target: deps"
 		if idx := strings.Index(line, ":"); idx > 0 {
+			// Skip variable assignments like "CYAN := \033[0;36m"
+			if idx+1 < len(line) && line[idx+1] == '=' {
+				continue
+			}
 			name := strings.TrimSpace(line[:idx])
 			// Skip variables (contain =), conditionals, etc.
 			if strings.ContainsAny(name, " \t=$.#") {

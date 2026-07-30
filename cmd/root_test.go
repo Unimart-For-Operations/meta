@@ -45,6 +45,40 @@ func TestResolveOrgDir(t *testing.T) {
 			t.Errorf("expected %q, got %q", tmpDir, dir)
 		}
 	})
+
+	t.Run("via walk-up from nested cwd", func(t *testing.T) {
+		orgDir = ""
+		t.Setenv("UNIMART_ORG_DIR", "")
+
+		nested := filepath.Join(tmpDir, "cmdr", "home", "02-hosts")
+		if err := os.MkdirAll(nested, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Chdir(nested)
+
+		dir, err := resolveOrgDir()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Resolve symlinks — macOS TempDir lives under /private
+		wantResolved, _ := filepath.EvalSymlinks(tmpDir)
+		gotResolved, _ := filepath.EvalSymlinks(dir)
+		if gotResolved != wantResolved {
+			t.Errorf("expected %q, got %q", wantResolved, gotResolved)
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		orgDir = ""
+		t.Setenv("UNIMART_ORG_DIR", "")
+
+		outside := t.TempDir()
+		t.Chdir(outside)
+
+		if _, err := resolveOrgDir(); err == nil {
+			t.Error("expected error when no org dir markers exist")
+		}
+	})
 }
 
 func TestIsOrgDir(t *testing.T) {
