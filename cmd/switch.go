@@ -11,6 +11,7 @@ import (
 )
 
 var switchHost string
+var switchHomeOnly bool
 
 var switchCmd = &cobra.Command{
 	Use:   "switch [host]",
@@ -22,6 +23,10 @@ against cmdr/home/02-hosts/*/meta.nix files. Override with --host or by
 passing a host name as an argument.
 
 On macOS, runs darwin-rebuild switch. On Linux, runs home-manager switch.
+On NixOS, runs nixos-rebuild switch.
+
+Use --home-only to apply only Home Manager state (no system rebuild).
+On macOS, --home-only is currently unsupported.
 First-time macOS runs will bootstrap nix-darwin automatically.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runSwitch,
@@ -29,6 +34,7 @@ First-time macOS runs will bootstrap nix-darwin automatically.`,
 
 func init() {
 	switchCmd.Flags().StringVar(&switchHost, "host", "", "host name to apply (overrides auto-detection)")
+	switchCmd.Flags().BoolVar(&switchHomeOnly, "home-only", false, "apply Home Manager only (no system rebuild)")
 	deliCmd.AddCommand(switchCmd)
 }
 
@@ -39,28 +45,72 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 	}
 	cmdrDir := filepath.Join(dir, "cmdr")
 
-	// Resolve host name: positional arg > --host flag > auto-detect
-	hostName := ""
+	// Resolve host: positional arg > --host flag > auto-detect
+	var info *host.Info
 	if len(args) > 0 {
-		hostName = args[0]
+		info, err = host.GetHost(dir, args[0])
+		if err != nil {
+			return fmt.Errorf("host %q not found: %w\n\nRun: unimart deli hosts   to list available hosts", args[0], err)
+		}
 	} else if switchHost != "" {
-		hostName = switchHost
+		info, err = host.GetHost(dir, switchHost)
+		if err != nil {
+			return fmt.Errorf("host %q not found: %w\n\nRun: unimart deli hosts   to list available hosts", switchHost, err)
+		}
 	} else {
-		info, err := host.Detect(dir)
+		info, err = host.Detect(dir)
 		if err != nil {
 			return fmt.Errorf("host auto-detection failed: %w\n\nUse: unimart deli switch <host-name>\nOr:  unimart deli switch --host <host-name>\nRun: unimart deli hosts   to list available hosts", err)
 		}
-		hostName = info.Name
 	}
+	hostName := info.Name
+	hostPlatform := info.Platform
 
 	fmt.Printf("%s Applying configuration for: %s\n\n", bold("▸"), cyan(hostName))
 
 	flakeRef := fmt.Sprintf(".#%s", hostName)
-
-	if platform.IsDarwin() {
-		return switchDarwin(cmdrDir, flakeRef)
+	mode, err := selectApplyMode(hostPlatform, switchHomeOnly)
+	if err != nil {
+		return err
 	}
-	return switchLinux(cmdrDir, flakeRef)
+
+	switch mode {
+	case applyModeDarwin:
+		return switchDarwin(cmdrDir, flakeRef)
+	case applyModeNixOS:
+		return switchNixOS(cmdrDir, flakeRef)
+	case applyModeLinux:
+		return switchLinux(cmdrDir, flakeRef)
+	case applyModeHomeOnly:
+		return switchHomeOnlyApply(cmdrDir, hostName)
+	default:
+		return fmt.Errorf("unsupported apply mode: %s", mode)
+	}
+}
+
+const (
+	applyModeDarwin   = "darwin"
+	applyModeNixOS    = "nixos"
+	applyModeLinux    = "linux"
+	applyModeHomeOnly = "home-only"
+)
+
+func selectApplyMode(hostPlatform string, homeOnly bool) (string, error) {
+	if homeOnly {
+		if hostPlatform == "macos" {
+			return "", fmt.Errorf("--home-only is not supported on macOS hosts yet")
+		}
+		return applyModeHomeOnly, nil
+	}
+
+	switch hostPlatform {
+	case "macos":
+		return applyModeDarwin, nil
+	case "nixos":
+		return applyModeNixOS, nil
+	default:
+		return applyModeLinux, nil
+	}
 }
 
 func switchDarwin(cmdrDir, flakeRef string) error {
@@ -97,5 +147,26 @@ func switchLinux(cmdrDir, flakeRef string) error {
 	}
 
 	fmt.Printf("\n%s Configuration applied\n", pass("[pass]"))
+	return nil
+}
+
+func switchNixOS(cmdrDir, flakeRef string) error {
+	fmt.Printf("  Running %s...\n", bold("nixos-rebuild switch"))
+	if err := platform.RunVisibleDir(cmdrDir, "sudo", "nixos-rebuild", "switch", "--flake", flakeRef); err != nil {
+		return fmt.Errorf("nixos-rebuild switch failed: %w", err)
+	}
+
+	fmt.Printf("\n%s Configuration applied\n", pass("[pass]"))
+	return nil
+}
+
+func switchHomeOnlyApply(cmdrDir, hostName string) error {
+	activationRef := fmt.Sprintf(".#homeConfigurations.%s.activationPackage", hostName)
+	fmt.Printf("  Running %s...\n", bold("nix run home activationPackage"))
+	if err := platform.RunVisibleDir(cmdrDir, "nix", "run", activationRef); err != nil {
+		return fmt.Errorf("home-only apply failed for %s: %w", activationRef, err)
+	}
+
+	fmt.Printf("\n%s Home Manager configuration applied\n", pass("[pass]"))
 	return nil
 }

@@ -59,10 +59,16 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		{"nix", checkCommand("nix", "--version")},
 	}
 
-	if platform.IsDarwin() {
+	hostPlatform := detectedHostPlatform(dir)
+
+	if hostPlatform == "macos" {
 		toolChecks = append(toolChecks,
 			check{"darwin-rebuild", checkExists("darwin-rebuild")},
 			check{"brew", checkCommand("brew", "--version")},
+		)
+	} else if hostPlatform == "nixos" {
+		toolChecks = append(toolChecks,
+			check{"nixos-rebuild", checkExists("nixos-rebuild")},
 		)
 	} else {
 		toolChecks = append(toolChecks,
@@ -96,6 +102,18 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func detectedHostPlatform(orgDir string) string {
+	if h, err := host.Detect(orgDir); err == nil && h.Platform != "" {
+		return h.Platform
+	}
+
+	if platform.IsDarwin() {
+		return "macos"
+	}
+
+	return "linux"
 }
 
 func printCheck(name, detail string, ok, fatal bool) {
