@@ -1,0 +1,189 @@
+# idpbuilder Organization
+
+This is the meta coordination repo and unified CLI (`unimart`) for the [idpbuilder](https://github.com/idpbuilder) GitHub organization. All component repos are tracked as git submodules (with `ignore = dirty`).
+
+## unimart CLI
+
+The `unimart` binary is a Go CLI built from this repo. It is the primary interface after initial setup. Commands are organized into store aisles:
+
+| Aisle | Domain | Key Commands |
+|-------|--------|--------------|
+| `deli` | Workstation config (Nix/HM) | `switch`, `doctor`, `bootstrap`, `hosts` |
+| `freezer` | IDP platform lifecycle | `up`, `down`, `status`, `build`, `doctor`, `repos`, `repos-publish-to-gitea` |
+| `stockroom` | Cross-repo coordination | `check` |
+
+Top-level commands (not under any aisle):
+
+| Command | Purpose |
+|---------|---------|
+| `open` | Bring the full IDP platform online (prereqs, build, create, publish, browser) |
+| `close` | Tear down the IDP platform (symmetric inverse of `open`) |
+| `reload` | Reconcile platform changes without teardown (re-run create + re-publish repos) |
+| `version` | Print version information |
+
+Source layout:
+- `main.go` — entry point
+- `cmd/` — Cobra commands (root, aisle parents, subcommands)
+- `internal/host/` — host auto-detection (scans cmdr meta.nix files)
+- `internal/platform/` — platform detection, command execution utilities
+- `internal/submodule/` — dynamic submodule discovery (parses `.gitmodules` at runtime)
+- `internal/builder/` — idpbuilder build and create orchestration
+- `internal/cluster/` — Kind cluster inspection (ArgoCD apps, secrets, Gitea token)
+- `internal/colima/` — Colima VM lifecycle (start, stop, status, socket path)
+- `internal/container/` — container image loading (Kind + Podman)
+- `internal/gitea/` — Gitea API client (repos, SSH keys, auth)
+- `internal/prereqs/` — prerequisite checks and installers (Go, Docker, Kind, kubectl, Colima, Podman)
+- `internal/repos/` — org repo discovery and Gitea publish
+- `internal/theme/` — theme loading, k9s skin and tmux status generation
+
+## Repositories
+
+| Repo | Purpose | Language | Status |
+|------|---------|----------|--------|
+| [cmdr](cmdr/) | Nix flake + Home Manager workstation config | Nix | Active |
+| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder (private fork of cnoe-io/idpbuilder) | Go | Active |
+
+## Distribution
+
+unimart is distributed through three channels:
+
+| Channel | Mechanism | When |
+|---------|-----------|------|
+| **Nix (primary)** | cmdr's flake imports `github:idpbuilder/meta` and includes `unimart` in `home.packages` via `04-modules/cli/graduated/unimart/` | Every `make switch` on every host |
+| **make init** | `scripts/setup.sh` step 6/7 builds from source, symlinks to `~/.local/bin/` | Fresh clones before Nix is configured |
+| **make install** | `go build` + symlink to `~/.local/bin/unimart` | Development iteration |
+
+### Nix distribution details
+
+The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's flake references it as a flake input (`meta.url = "github:idpbuilder/meta"`). The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
+
+**Version pinning**: cmdr's `flake.lock` pins the meta commit. To bump: push meta changes, then run `nix flake update meta` in cmdr + `make switch`.
+
+**Circular dependency note**: meta has cmdr as a submodule; cmdr references meta's flake by GitHub URL (not submodule path). Nix evaluates these independently — no real cycle. But version bumps need care: always push meta first, then update cmdr's lock.
+
+## Conventions
+
+- **Nix-first**: The user's system is Nix-managed (nix-darwin + home-manager via cmdr). All CLI tooling via Nix. Homebrew only for Colima on macOS.
+- **DCO sign-off**: All repos require `git commit -s` for Developer Certificate of Origin.
+- **Git submodules**: All repos are tracked as submodules in this meta repo (`ignore = dirty`). Use `make bootstrap` for first-time init.
+- **Commit style**: Conventional commits — `feat(scope):`, `fix:`, `docs:`, `refactor:`.
+- **Makefile convention**: All repos use a consistent Makefile style — color output, `.DEFAULT_GOAL := help`, hand-crafted sectioned help, `@`-silenced commands, `## description` comments, `[pass]/[fail]/[warn]` status indicators. After `unimart` is installed, Make targets delegate to it.
+
+## Development
+
+```bash
+go build ./...                 # Compile (fast check for errors)
+go test ./...                  # Run all tests
+make install                   # Build + symlink to ~/.local/bin/unimart
+make init                      # Full bootstrap (fresh clone, no Nix yet)
+unimart stockroom check        # Run contract validation across org
+```
+
+**Go version:** See `go.mod` for the minimum version. The Nix devShell (`nix develop`) provides the correct Go toolchain.
+
+**Adding a new command:** Follow the Cobra pattern in `cmd/`. Each aisle parent (`deli.go`, `freezer.go`, etc.) is a `cobra.Command` with no `RunE`. Subcommands register themselves via `init()` with `parentCmd.AddCommand()`. See `cmd/freezer_up.go` for the current pattern.
+
+**Org directory resolution:** `resolveOrgDir()` in `cmd/root.go` detects the org root. It tries `--org-dir` flag → `UNIMART_ORG_DIR` env → walk up from CWD looking for `.gitmodules`.
+
+## Infrastructure
+
+### Physical Hosts
+
+| Host | Platform | System | Username |
+|------|----------|--------|----------|
+| `apple-studio-m2-max` | macOS | `aarch64-darwin` | `cmdr` |
+| `apple-macbook-m3-pro` | macOS | `aarch64-darwin` | `mortimera` |
+| `cmdr` | Arch Linux | `x86_64-linux` | `cmdr` |
+| `cachyos` | Arch Linux | `x86_64-linux` | `cmdr` |
+
+**Known issue**: Both `arch/cmdr` and `arch/cachyos` have `username = "cmdr"`, so host auto-detection on Linux may select the wrong host based on directory enumeration order.
+
+### Git Hooks
+
+All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.nix` and deployed to `~/.githooks/` via `unimart deli switch`.
+
+| Hook | Gates | Speed |
+|------|-------|-------|
+| `pre-commit` | nix fmt, go fmt, go vet, gitleaks, theme lint (cmdr) | Fast |
+| `commit-msg` | conventional commit, DCO sign-off | Instant |
+| `pre-push` | go build, go test, nix flake check | Slow |
+
+**Comment character**: `core.commentChar = ";"` — so `##` markdown headers in commit messages survive `commit.cleanup`.
+
+## Key Paths
+
+```
+~/repos/github/idpbuilder/              This directory (meta repo)
+├── AGENTS.md                            This file
+├── main.go                              CLI entry point
+├── go.mod / go.sum                      Go module
+├── flake.nix                            Nix packaging + devShell + overlay
+├── cmd/                                 Cobra command tree
+│   ├── root.go                          Root command, color helpers, org-dir resolution
+│   ├── version.go                       Version command with ldflags injection
+│   ├── open.go                          Top-level: open for business (6-step IDP startup)
+│   ├── close.go                         Top-level: close up shop (symmetric inverse of open)
+│   ├── reload.go                        Top-level: reconcile changes without teardown
+│   ├── helpers.go                       Shared prereq/docker/build helpers
+│   ├── deli.go                          Aisle parent
+│   ├── switch.go                        deli switch (Nix apply)
+│   ├── hosts.go                         deli hosts (list host configs)
+│   ├── doctor.go                        deli doctor (prerequisite checks)
+│   ├── bootstrap.go                     deli bootstrap (full setup)
+│   ├── freezer.go                       Aisle parent (--container-runtime flag)
+│   ├── freezer_up.go                    freezer up (4-step platform startup)
+│   ├── freezer_down.go                  freezer down (cluster teardown)
+│   ├── freezer_status.go               freezer status (cluster + ArgoCD + secrets)
+│   ├── freezer_build.go                freezer build (idpbuilder make build)
+│   ├── freezer_doctor.go               freezer doctor (prerequisite checks)
+│   ├── freezer_bootstrap.go            freezer bootstrap (install prerequisites)
+│   ├── freezer_repos.go                freezer repos (list/clone/status)
+│   ├── freezer_repos_publish.go        freezer repos publish-to-gitea
+│   ├── stockroom.go                     Aisle parent
+│   └── stockroom_check.go              stockroom check (CI contract validation)
+├── internal/
+│   ├── host/detect.go                   Host auto-detection (scans meta.nix)
+│   ├── platform/detect.go              Platform detection, command execution
+│   ├── platform/browser.go             Platform-aware OpenBrowser(url)
+│   ├── submodule/submodule.go          Dynamic submodule discovery (.gitmodules parser)
+│   ├── builder/builder.go              Build(), Create(), Delete(), KindDeleteCluster()
+│   ├── cluster/cluster.go              IsClusterRunning(), GetArgoApps(), GetSecrets(), GetGiteaAdminToken()
+│   ├── colima/colima.go                Start(), Stop(), IsRunning(), EnsureDockerHost(), SocketPath()
+│   ├── container/runtime.go            LoadImageIntoKind(), GatherImagesFromIdpbuilder()
+│   ├── gitea/gitea.go                  RepoExists(), CreateRepo(), ListUserKeys(), auth helpers
+│   ├── prereqs/                         Prerequisite checks and installers
+│   │   ├── prereqs.go                  CheckResult, Platform(), CommandExists(), HasNix(), HasBrew()
+│   │   ├── docker.go                   CheckDocker(), CheckColima(), InstallDocker()
+│   │   ├── go.go                       CheckGo(), InstallGo()
+│   │   ├── kind.go                     CheckKind(), InstallKind()
+│   │   ├── kubectl.go                  CheckKubectl()
+│   │   ├── podman.go                   CheckPodman(), InstallPodman()
+│   │   └── workspace.go               CheckWorkspaceIdpbuilder()
+│   ├── repos/repos.go                  ListRemote(), ListLocal(), Clone(), SetRemoteAndPush()
+│   └── theme/                           Theme loading and config generation
+│       ├── theme.go                     LoadFromOrg(), GenerateK9sSkin(), GenerateTmuxStatus()
+│       └── fixtures/theme-sample.json  Test fixture
+├── scripts/setup.sh                     make init bootstrap script (7 steps)
+├── Makefile                             HAS_UNIMART delegation + shell fallbacks
+├── packages/                            Custom ArgoCD Application YAMLs (passed to idpbuilder -p)
+├── containers/                          Test infrastructure
+├── repositories/                        Publish-to-Gitea symlink directory
+├── cmdr/                                Nix workstation config (submodule)
+└── idpbuilder/                          IDP builder (submodule)
+```
+
+## Working in This Directory
+
+This is the org coordination hub. Every component repo is a git submodule with its own `AGENTS.md`. When working across repos, read the target repo's `AGENTS.md` first — it has repo-specific architecture, build/test commands, and conventions.
+
+| Entry Point | Read This First | Then This |
+|-------------|----------------|-----------|
+| `meta/` (this dir) | This file | Target repo's `AGENTS.md` |
+| `cmdr/` | `cmdr/AGENTS.md` | This file for org context |
+| `idpbuilder/` | `idpbuilder/AGENTS.md` | This file for org context |
+
+For on-demand deep knowledge, load these skills:
+- `unimart-dev` — Build, test, add commands, dev workflow
+- `nix-modules` — cmdr's tiered module system, host discovery, meta.nix
+- `upstream-mgmt` — idpbuilder's cherry-pick workflow from cnoe-io
+- `makefile-convention` — Shared Makefile style guide

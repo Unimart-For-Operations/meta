@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: act-runner
+  namespace: gitea
+  labels:
+    app: act-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: act-runner
+  template:
+    metadata:
+      labels:
+        app: act-runner
+    spec:
+      serviceAccountName: act-runner
+      restartPolicy: Always
+      volumes:
+        - name: runner-data
+          emptyDir: {}
+        - name: runner-config
+          configMap:
+            name: act-runner-config
+        - name: docker-certs
+          emptyDir: {}
+        - name: token
+          emptyDir:
+            medium: Memory
+        - name: gitea-credential
+          secret:
+            secretName: gitea-credential
+      initContainers:
+        # Fetch a runner registration token from Gitea's API.
+        # The admin token is mounted from the gitea-credential secret;
+        # curl calls the registration-token endpoint and writes the
+        # result for the runner container to read.
+        - name: get-token
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              ADMIN_TOKEN=$(cat /gitea-credential/token)
+
+              echo "Waiting for Gitea API..."
+              until curl -sf -o /dev/null \
+                "http://my-gitea-http.gitea.svc.cluster.local:3000/api/v1/settings/api"; do
+                sleep 2
+              done
+
+              echo "Requesting runner registration token..."
+              REG_TOKEN=$(curl -sf \
+                -H "Authorization: token ${ADMIN_TOKEN}" \
+                "http://my-gitea-http.gitea.svc.cluster.local:3000/api/v1/admin/runners/registration-token" \
+                | sed 's/.*"token":"\([^"]*\)".*/\1/')
+
+              if [ -z "${REG_TOKEN}" ]; then
+                echo "ERROR: failed to obtain registration token"
+                exit 1
+              fi
+
+              echo "Registration token obtained."
+              echo "${REG_TOKEN}" > /token/registration-token
+          volumeMounts:
+            - name: token
+              mountPath: /token
+            - name: gitea-credential
+              mountPath: /gitea-credential
+              readOnly: true
+      containers:
+        # act_runner — polls Gitea for jobs and dispatches them into
+        # Docker containers running in the DinD sidecar.
+        - name: runner
+          image: gitea/act_runner:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Wait for Docker daemon TLS certs to be generated
+              echo "Waiting for Docker daemon..."
+              while [ ! -f /certs/client/ca.pem ]; do
+                sleep 2
+              done
+              sleep 1  # let daemon finish TLS setup
+
+              # Read the registration token written by init container
+              REG_TOKEN=$(cat /token/registration-token)
+
+              # Register with the in-cluster Gitea instance
+              act_runner register --no-interactive \
+                --instance http://my-gitea-http.gitea.svc.cluster.local:3000 \
+                --token "${REG_TOKEN}" \
+                --name localdev-runner \
+                --labels "ubuntu-latest:docker://catthehacker/ubuntu:act-latest"
+
+              act_runner daemon --config /config/config.yaml
+          env:
+            - name: DOCKER_HOST
+              value: tcp://localhost:2376
+            - name: DOCKER_CERT_PATH
+              value: /certs/client
+            - name: DOCKER_TLS_VERIFY
+              value: "1"
+          volumeMounts:
+            - name: runner-data
+              mountPath: /data
+            - name: runner-config
+              mountPath: /config
+              readOnly: true
+            - name: docker-certs
+              mountPath: /certs
+            - name: token
+              mountPath: /token
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+        # Docker-in-Docker sidecar — provides the Docker daemon that
+        # act_runner uses to run workflow job containers.
+        - name: daemon
+          image: docker:dind
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: /certs
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: docker-certs
+              mountPath: /certs
+            - name: runner-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi

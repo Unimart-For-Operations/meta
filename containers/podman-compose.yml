@@ -1,0 +1,33 @@
+services:
+  init-test:
+    # Ubuntu 24.04 LTS — reuses cmdr's Dockerfile
+    # Tests the full `make init` onboarding flow end-to-end
+    # Run with: make test (from meta repo root)
+    platform: linux/amd64
+
+    build:
+      context: ../cmdr
+      dockerfile: containers/Dockerfile
+      platforms:
+        - linux/amd64
+
+    # Mount meta repo as read-only — test script copies to writable location
+    volumes:
+      - ..:/workspace:ro
+
+    # Keep container running for non-interactive exec
+    stdin_open: true
+    tty: true
+
+    # Distinct name from cmdr's dev-control-plane-linux
+    container_name: idpbuilder-init-test
+
+    # Environment variables
+    environment:
+      - TERM=xterm-256color
+
+    # Working directory
+    working_dir: /home/nixuser
+
+    # Use entrypoint (auto-installs Nix, then sleeps for exec)
+    command: ["/home/nixuser/entrypoint.sh"]

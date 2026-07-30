@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: act-runner-config
+  namespace: gitea
+data:
+  config.yaml: |
+    log:
+      level: info
+
+    runner:
+      capacity: 1
+      timeout: 1h
+      fetch_timeout: 5s
+      fetch_interval: 2s
+
+    container:
+      # Pass Kubernetes CoreDNS to job containers so they can resolve
+      # in-cluster service names (e.g. my-gitea-http.gitea.svc.cluster.local).
+      # Without this, DinD job containers use Docker's default DNS which
+      # has no knowledge of the Kubernetes service network.
+      options: "--dns 10.96.0.10"
+      force_pull: false
+
+    cache:
+      enabled: false

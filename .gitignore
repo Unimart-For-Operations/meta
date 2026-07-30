@@ -1,0 +1,33 @@
+# Local workspace artifacts
+.workspace/
+.opencode/
+result
+result/
+result-*
+
+# Go build artifacts
+unimart
+dist/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Nix
+.direnv/
+
+# Secrets — never commit
+*.pem
+*.key
+credentials.json
+.env
+.env.*
+!.env.example
