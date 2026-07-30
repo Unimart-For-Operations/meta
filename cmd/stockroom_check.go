@@ -31,6 +31,9 @@ var requiredDocDirs = []string{"Contributing", "Getting-Started", "Reference"}
 // requiredMakeTargets are the Makefile targets every submodule should have.
 var requiredMakeTargets = []string{"help", "hooks"}
 
+// allowedSubmoduleGitHubOrgs are approved GitHub orgs for absolute submodule remotes.
+var allowedSubmoduleGitHubOrgs = []string{"idpbuilder", "Unimart-For-Operations"}
+
 func runStockroomCheck(cmd *cobra.Command, args []string) error {
 	dir, err := resolveOrgDir()
 	if err != nil {
@@ -69,12 +72,8 @@ func runStockroomCheck(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s\n", bold("[2/6] Remote URLs (security check)"))
 	for _, mod := range subs {
 		name := mod.DisplayName()
-		// Relative URLs (../foo.git) resolve against the parent remote,
-		// so they inherit the org. Absolute URLs must point at idpbuilder/.
-		if strings.HasPrefix(mod.URL, "../") {
-			fmt.Printf(fmtStr, pass("[pass]"), name, fmt.Sprintf("→ %s (relative)", mod.URL))
-		} else if strings.Contains(mod.URL, "github.com") && strings.Contains(mod.URL, "idpbuilder/") {
-			fmt.Printf(fmtStr, pass("[pass]"), name, "→ idpbuilder org")
+		if remoteLabel, ok := classifySubmoduleRemote(mod.URL); ok {
+			fmt.Printf(fmtStr, pass("[pass]"), name, remoteLabel)
 		} else {
 			fmt.Printf(fmtStr, fail("[fail]"), name, fmt.Sprintf("→ %s (UNEXPECTED REMOTE)", mod.URL))
 			errors++
@@ -195,6 +194,26 @@ func runStockroomCheck(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	return nil
+}
+
+func classifySubmoduleRemote(remoteURL string) (string, bool) {
+	// Relative URLs (../foo.git) resolve against the parent remote,
+	// so they inherit the org.
+	if strings.HasPrefix(remoteURL, "../") {
+		return fmt.Sprintf("→ %s (relative)", remoteURL), true
+	}
+
+	if !strings.Contains(remoteURL, "github.com") {
+		return "", false
+	}
+
+	for _, org := range allowedSubmoduleGitHubOrgs {
+		if strings.Contains(remoteURL, "/"+org+"/") || strings.Contains(remoteURL, ":"+org+"/") {
+			return fmt.Sprintf("→ %s org", org), true
+		}
+	}
+
+	return "", false
 }
 
 // parseMakefileTargets scans a Makefile and returns a set of target names.
