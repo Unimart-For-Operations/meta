@@ -40,6 +40,28 @@ func IsClusterRunning() bool {
 	return clusters != ""
 }
 
+// StaticPasswordEnabled reports whether the existing LocalBuild CR was
+// created with the --dev-password flag (spec.buildCustomization.staticPassword).
+// The second return value is false when the setting cannot be determined
+// (cluster unreachable, no LocalBuild yet, or kubectl unavailable). When a
+// LocalBuild exists without the field set (zero value), it was created
+// without --dev-password and reports (false, true).
+func StaticPasswordEnabled() (enabled, determined bool) {
+	out, err := exec.Command("kubectl", "get", "localbuild",
+		"-o", "jsonpath={.items[0].metadata.name}").Output()
+	if err != nil || strings.TrimSpace(string(out)) == "" {
+		// No LocalBuild (fresh cluster) or cluster unreachable.
+		return false, false
+	}
+
+	out, err = exec.Command("kubectl", "get", "localbuild",
+		"-o", "jsonpath={.items[0].spec.buildCustomization.staticPassword}").Output()
+	if err != nil {
+		return false, false
+	}
+	return strings.TrimSpace(string(out)) == "true", true
+}
+
 // GetClusterName returns the name of the running Kind cluster.
 func GetClusterName() string {
 	out, err := exec.Command("kind", "get", "clusters").Output()

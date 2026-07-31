@@ -93,16 +93,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 
 	// Resolve packages dir (may not exist yet — that's fine, idpbuilder handles it)
 	packagesDir := filepath.Join(orgDir, "packages")
-	createArgs := []string{
-		"--dev-password",
-		"--no-exit=false",
-	}
-	// Only pass -p if packages dir exists and is not empty
-	if hasPackages(packagesDir) {
-		createArgs = append(createArgs, "-p", packagesDir)
-	}
-	// Append any extra args the user passed after --
-	createArgs = append(createArgs, args...)
+	createArgs := idpCreateArgs(packagesDir, args)
 
 	if err := createIDP(idpDir, createArgs); err != nil {
 		return err

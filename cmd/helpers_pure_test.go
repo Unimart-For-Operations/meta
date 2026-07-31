@@ -96,6 +96,27 @@ func TestDisplayList(t *testing.T) {
 	}
 }
 
+func TestDevPasswordFlag(t *testing.T) {
+	tests := []struct {
+		name       string
+		determined bool
+		enabled    bool
+		want       string
+	}{
+		{"fresh cluster (undetermined)", false, false, "--dev-password"},
+		{"existing with dev password", true, true, "--dev-password"},
+		{"existing with generated password", true, false, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := devPasswordFlag(tt.determined, tt.enabled); got != tt.want {
+				t.Errorf("devPasswordFlag(%v, %v) = %q, want %q", tt.determined, tt.enabled, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHasPackages(t *testing.T) {
 	t.Run("missing dir", func(t *testing.T) {
 		if hasPackages(filepath.Join(t.TempDir(), "nope")) {

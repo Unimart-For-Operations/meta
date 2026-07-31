@@ -54,14 +54,7 @@ func runReload(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%s Reconciling IDP platform\n\n", bold("[1/2]"))
 
 		packagesDir := filepath.Join(orgDir, "packages")
-		createArgs := []string{
-			"--dev-password",
-			"--no-exit=false",
-		}
-		if hasPackages(packagesDir) {
-			createArgs = append(createArgs, "-p", packagesDir)
-		}
-		createArgs = append(createArgs, args...)
+		createArgs := idpCreateArgs(packagesDir, args)
 
 		if err := builder.Create(idpDir, createArgs); err != nil {
 			return err

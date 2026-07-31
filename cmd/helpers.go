@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Unimart-For-Operations/meta/internal/builder"
+	"github.com/Unimart-For-Operations/meta/internal/cluster"
 	"github.com/Unimart-For-Operations/meta/internal/colima"
 	"github.com/Unimart-For-Operations/meta/internal/prereqs"
 )
@@ -100,6 +101,33 @@ func buildIdpbuilder(idpDir, stepLabel string, skipBuild bool) error {
 
 func createIDP(idpDir string, args []string) error {
 	return builder.Create(idpDir, args)
+}
+
+// devPasswordFlag returns "--dev-password" when the existing cluster was
+// created with it, or when the cluster state can't be determined (fresh
+// cluster — unimart's default). Returns "" for an existing cluster created
+// with a generated password, so idpbuilder's create can reconcile it.
+func devPasswordFlag(determined, enabled bool) string {
+	if !determined || enabled {
+		return "--dev-password"
+	}
+	return ""
+}
+
+// idpCreateArgs builds the idpbuilder create argument list for open/reload.
+// It always matches the existing cluster's dev-password setting so a
+// reconcile (reload) succeeds without a teardown, while keeping
+// --dev-password as the default for fresh clusters.
+func idpCreateArgs(packagesDir string, extraArgs []string) []string {
+	enabled, determined := cluster.StaticPasswordEnabled()
+	args := []string{"--no-exit=false"}
+	if flag := devPasswordFlag(determined, enabled); flag != "" {
+		args = append([]string{flag}, args...)
+	}
+	if hasPackages(packagesDir) {
+		args = append(args, "-p", packagesDir)
+	}
+	return append(args, extraArgs...)
 }
 
 func dockerEndpointIsPodman() bool {
