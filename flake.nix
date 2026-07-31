@@ -32,6 +32,10 @@
             src = ./.;
             vendorHash = "sha256-DWBIYmPJADeC8HD5bKw7H0c2/Xu+Jp/UkLO4wr5L1Jk=";
 
+            # Unit tests (internal/repos) shell out to `git` (e.g. `git init`
+            # for temp test repos); make it available during the check phase.
+            nativeBuildInputs = [ pkgs.git ];
+
             ldflags = [
               "-s"
               "-w"
