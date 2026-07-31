@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultGiteaURL = "https://gitea.cnoe.localtest.me:8443"
-	defaultOwner    = "idpbuilder"
+	defaultOwner    = "Unimart-For-Operations"
 	argoCDURL       = "https://argocd.cnoe.localtest.me:8443"
 )
 
@@ -112,7 +112,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	// Step 5: Publish all org repos to in-cluster Gitea
 	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[5/6]"))
 
-	token, err := cluster.GetGiteaAdminToken()
+	token, err := cluster.GetGiteaAdminToken(defaultGiteaURL)
 	if err != nil {
 		fmt.Printf("  %s could not discover Gitea token: %v\n", warn("[warn]"), err)
 		fmt.Println("  Skipping publish — run manually: unimart freezer repos publish-to-gitea")

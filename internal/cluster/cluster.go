@@ -1,10 +1,16 @@
 package cluster
 
 import (
+	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // ArgoApp represents a minimal ArgoCD Application for status display.
@@ -137,11 +143,152 @@ func decodeBase64(s string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// GetGiteaAdminToken attempts to read a Gitea admin token from known secret
-// locations in the cluster. It prefers the token stored in the
-// "gitea-credential" secret (data.token), falling back to other common
-// secret names. Returns an error if the token cannot be located or decoded.
-func GetGiteaAdminToken() (string, error) {
+// GetGiteaAdminCredentials reads the Gitea admin username and password from
+// the "gitea-credential" secret in the gitea namespace.
+func GetGiteaAdminCredentials() (username, password string, err error) {
+	readSecret := func(key string) (string, error) {
+		out, err := exec.Command("kubectl", "get", "secret", "gitea-credential", "-n", "gitea", "-o", fmt.Sprintf("jsonpath={.data.%s}", key)).Output()
+		if err != nil {
+			return "", err
+		}
+		if len(strings.TrimSpace(string(out))) == 0 {
+			return "", fmt.Errorf("key %s not present in gitea-credential secret", key)
+		}
+		decoded, derr := decodeBase64(strings.TrimSpace(string(out)))
+		if derr != nil {
+			return "", derr
+		}
+		return decoded, nil
+	}
+
+	username, err = readSecret("username")
+	if err != nil {
+		return "", "", err
+	}
+	password, err = readSecret("password")
+	if err != nil {
+		return "", "", err
+	}
+	return username, password, nil
+}
+
+// mintGiteaTokenWithURL creates an all-scope access token for the given user
+// via basic auth (POST /api/v1/users/{username}/tokens) and returns the
+// token value. Idempotent: an existing "unimart" token is deleted first.
+func mintGiteaTokenWithURL(username, password, baseURL string) (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}}
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid gitea url: %w", err)
+	}
+
+	// Remove a previously created "unimart" token so we don't accumulate.
+	if existing, err := listGiteaTokens(client, base, username, password); err == nil {
+		for _, t := range existing {
+			if t.Name == "unimart" {
+				_ = deleteGiteaToken(client, base, username, password, t.ID)
+			}
+		}
+	}
+
+	u := *base
+	u.Path = fmt.Sprintf("/api/v1/users/%s/tokens", username)
+	body := map[string]interface{}{
+		"name":   "unimart",
+		"scopes": []string{"all"},
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(b))
+	if err != nil {
+		return "", err
+	}
+	req.SetBasicAuth(username, password)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		rb, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("minting gitea token failed: %d %s", resp.StatusCode, string(rb))
+	}
+
+	var out struct {
+		Token string `json:"sha1"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	return out.Token, nil
+}
+
+// listGiteaTokens lists access tokens for a user via basic auth.
+func listGiteaTokens(client *http.Client, base *url.URL, username, password string) ([]struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}, error) {
+	u := *base
+	u.Path = fmt.Sprintf("/api/v1/users/%s/tokens", username)
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(username, password)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("list user tokens failed: %d", resp.StatusCode)
+	}
+	var tokens []struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
+		return nil, err
+	}
+	return tokens, nil
+}
+
+// deleteGiteaToken removes a user's access token via basic auth.
+func deleteGiteaToken(client *http.Client, base *url.URL, username, password string, id int64) error {
+	u := *base
+	u.Path = fmt.Sprintf("/api/v1/users/%s/tokens/%d", username, id)
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(username, password)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("delete user token failed: %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// GetGiteaAdminToken attempts to obtain a Gitea admin token. It prefers the
+// token stored in the "gitea-credential" secret (data.token). If the secret
+// only carries username+password (some idpbuilder versions), it mints an
+// all-scope token on demand via the Gitea API using basic auth. baseURL is
+// the Gitea instance used for token minting. Returns an error if neither
+// path succeeds.
+func GetGiteaAdminToken(baseURL string) (string, error) {
 	// Try gitea-credential (used by idpbuilder manifests)
 	out, err := exec.Command("kubectl", "get", "secret", "gitea-credential", "-n", "gitea", "-o", "jsonpath={.data.token}").Output()
 	if err == nil {
@@ -153,7 +300,10 @@ func GetGiteaAdminToken() (string, error) {
 		}
 	}
 
-	// Fallback: older installers may use gitea-admin-secret with password only
-	// In that case we cannot derive a token, so return not found.
-	return "", fmt.Errorf("gitea admin token not found in cluster secrets")
+	// Fallback: mint a token from the admin username+password using basic auth.
+	username, password, err := GetGiteaAdminCredentials()
+	if err != nil {
+		return "", fmt.Errorf("gitea admin token not found in cluster secrets: %w", err)
+	}
+	return mintGiteaTokenWithURL(username, password, baseURL)
 }

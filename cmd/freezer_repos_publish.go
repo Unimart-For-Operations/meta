@@ -20,6 +20,7 @@ var (
 	publishNonInteractive bool
 	publishUseSSH         bool
 	publishSSHKeyPath     string
+	publishSSHUser        string
 )
 
 var freezerReposPublishCmd = &cobra.Command{
@@ -30,13 +31,22 @@ var freezerReposPublishCmd = &cobra.Command{
 
 func init() {
 	freezerReposPublishCmd.Flags().StringVar(&publishGiteaURL, "gitea-url", "", "Gitea base URL (eg https://gitea.local:8443)")
-	freezerReposPublishCmd.Flags().StringVar(&publishOwner, "owner", "idpbuilder", "Gitea org/owner to publish into")
+	freezerReposPublishCmd.Flags().StringVar(&publishOwner, "owner", "Unimart-For-Operations", "Gitea org/owner to publish into")
 	freezerReposPublishCmd.Flags().StringVar(&publishToken, "token", "", "Gitea admin token (optional; prompt/use cluster secret if empty)")
 	freezerReposPublishCmd.Flags().BoolVar(&publishDryRun, "dry-run", true, "Show planned actions without executing")
 	freezerReposPublishCmd.Flags().BoolVar(&publishNonInteractive, "non-interactive", false, "Run without prompts (requires --token and --use-ssh flags set as needed)")
 	freezerReposPublishCmd.Flags().BoolVar(&publishUseSSH, "use-ssh", false, "Use SSH remotes for pushes (non-interactive friendly)")
 	freezerReposPublishCmd.Flags().StringVar(&publishSSHKeyPath, "ssh-key-path", "", "Path to public SSH key to upload (non-interactive)")
+	freezerReposPublishCmd.Flags().StringVar(&publishSSHUser, "ssh-user", "", "Gitea user to associate the SSH key with (defaults to --owner)")
 	freezerReposCmd.AddCommand(freezerReposPublishCmd)
+}
+
+func defaultKeyTitle() string {
+	hn := "host"
+	if h, herr := os.Hostname(); herr == nil {
+		hn = h
+	}
+	return fmt.Sprintf("%s@unimart", hn)
 }
 
 func runFreezerReposPublish(cmd *cobra.Command, args []string) error {
@@ -74,7 +84,7 @@ func runFreezerReposPublish(cmd *cobra.Command, args []string) error {
 	token := publishToken
 	if token == "" {
 		// try cluster discovery
-		t, err := cluster.GetGiteaAdminToken()
+		t, err := cluster.GetGiteaAdminToken(publishGiteaURL)
 		if err == nil {
 			token = t
 			if !publishNonInteractive {
@@ -82,7 +92,7 @@ func runFreezerReposPublish(cmd *cobra.Command, args []string) error {
 			}
 		} else if !publishNonInteractive {
 			if promptYesNo("No token provided. Try to discover admin token from in-cluster secret 'gitea-credential'? (Y/n): ", true) {
-				t2, err2 := cluster.GetGiteaAdminToken()
+				t2, err2 := cluster.GetGiteaAdminToken(publishGiteaURL)
 				if err2 == nil {
 					token = t2
 					fmt.Println("Discovered admin token from cluster.")
@@ -137,8 +147,17 @@ func runFreezerReposPublish(cmd *cobra.Command, args []string) error {
 			useSSH = promptYesNo("Use SSH remote for pushes? (recommended) (Y/n): ", true)
 		}
 		if useSSH {
-			// If SSH chosen, ensure key exists on remote user; attempt to add it if missing
-			keys, kerr := gitea.ListUserKeys(publishGiteaURL, publishOwner, token, true)
+			// Determine which Gitea user owns the SSH key used for pushes.
+			// For org publishing this differs from the repo owner (orgs can't
+			// hold SSH keys), so it's configurable via --ssh-user.
+			sshUser := publishSSHUser
+			if sshUser == "" {
+				sshUser = publishOwner
+			}
+
+			// If SSH chosen, ensure key exists on the target user; attempt to
+			// add it if missing.
+			keys, kerr := gitea.ListUserKeys(publishGiteaURL, sshUser, token, true)
 			if kerr == nil {
 				keyPath := publishSSHKeyPath
 				if keyPath == "" {
@@ -156,9 +175,12 @@ func runFreezerReposPublish(cmd *cobra.Command, args []string) error {
 				}
 				if !hasKey {
 					authUser, _ := gitea.GetAuthenticatedUser(publishGiteaURL, token, true)
-					if authUser == publishOwner {
-						if promptYesNo("Local SSH public key not found in your Gitea account. Upload it now to your account? (y/N): ", false) {
-							title := promptString("Key title (e.g. 'laptop'): ")
+					if authUser == sshUser {
+						if publishNonInteractive || promptYesNo("Local SSH public key not found in your Gitea account. Upload it now to your account? (y/N): ", false) {
+							title := defaultKeyTitle()
+							if !publishNonInteractive {
+								title = promptString("Key title (e.g. 'laptop'): ")
+							}
 							if perr := gitea.CreateOwnKey(publishGiteaURL, token, title, strings.TrimSpace(string(pub)), true); perr != nil {
 								return fmt.Errorf("failed to create own key: %w", perr)
 							}
@@ -167,9 +189,12 @@ func runFreezerReposPublish(cmd *cobra.Command, args []string) error {
 							fmt.Println("Skipping SSH upload; push may fail if key not present.")
 						}
 					} else {
-						if promptYesNo("Local SSH public key not found in Gitea user. Upload it now (requires admin token)? (y/N): ", false) {
-							title := promptString("Key title (e.g. 'laptop'): ")
-							if perr := gitea.CreateUserKey(publishGiteaURL, publishOwner, token, title, strings.TrimSpace(string(pub)), true); perr != nil {
+						if publishNonInteractive || promptYesNo("Local SSH public key not found in Gitea user. Upload it now (requires admin token)? (y/N): ", false) {
+							title := defaultKeyTitle()
+							if !publishNonInteractive {
+								title = promptString("Key title (e.g. 'laptop'): ")
+							}
+							if perr := gitea.CreateUserKey(publishGiteaURL, sshUser, token, title, strings.TrimSpace(string(pub)), true); perr != nil {
 								return fmt.Errorf("failed to create user key: %w", perr)
 							}
 							fmt.Println("Uploaded SSH key to Gitea user account.")

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const defaultOrg = "idpbuilder"
+const defaultOrg = "Unimart-For-Operations"
 
 // repositoriesDirName is the designated directory under orgDir that contains
 // repos intended for local Gitea publish flows.

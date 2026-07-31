@@ -46,7 +46,7 @@ func init() {
 	freezerUpCmd.Flags().IntVar(&upDisk, "disk", defaults.Disk, "Colima VM disk in GB (macOS only)")
 	freezerUpCmd.Flags().BoolVar(&upPublishLocalRepos, "publish-local-repos", false, "Publish local org repos into in-cluster Gitea (opt-in)")
 	freezerUpCmd.Flags().StringVar(&upPublishGiteaURL, "publish-gitea-url", "", "Gitea base URL (required when publishing)")
-	freezerUpCmd.Flags().StringVar(&upPublishOwner, "publish-owner", "giteaAdmin", "Gitea owner/org to publish into")
+	freezerUpCmd.Flags().StringVar(&upPublishOwner, "publish-owner", "Unimart-For-Operations", "Gitea owner/org to publish into")
 	freezerUpCmd.Flags().StringVar(&upPublishToken, "publish-token", "", "Gitea admin token (optional)")
 	freezerUpCmd.Flags().BoolVar(&upPublishDryRun, "publish-dry-run", true, "Dry-run the publish step (default true)")
 	freezerUpCmd.Flags().BoolVar(&upPublishNonInteractive, "publish-non-interactive", false, "Run without prompts (requires token and defaults)")

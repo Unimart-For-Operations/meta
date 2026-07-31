@@ -75,7 +75,7 @@ func runReload(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[2/2]"))
 
-		token, err := cluster.GetGiteaAdminToken()
+		token, err := cluster.GetGiteaAdminToken(defaultGiteaURL)
 		if err != nil {
 			fmt.Printf("  %s could not discover Gitea token: %v\n", warn("[warn]"), err)
 			fmt.Println("  Skipping publish — run manually: unimart freezer repos publish-to-gitea")

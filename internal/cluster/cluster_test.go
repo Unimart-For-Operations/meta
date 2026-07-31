@@ -11,7 +11,7 @@ import (
 func TestGetGiteaAdminToken_NoKubectl(t *testing.T) {
 	// Temporarily manipulate PATH to ensure kubectl is not found would be
 	// intrusive; instead, call the function and expect an error in CI.
-	_, err := GetGiteaAdminToken()
+	_, err := GetGiteaAdminToken("https://gitea.cnoe.localtest.me:8443")
 	if err == nil {
 		// If kubectl is present and cluster available, that's okay — just skip
 		t.Skip("kubectl present; skipping negative test")

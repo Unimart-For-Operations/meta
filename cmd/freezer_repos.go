@@ -118,12 +118,12 @@ func runFreezerReposStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("%s Local repositories in %s:\n\n", bold(">>"), orgDir)
-
-	local, err := repos.ListLocal(orgDir)
+	local, sourceDir, err := repos.ListPublishable(orgDir)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("%s Repositories ready for publish (from %s):\n\n", bold(">>"), sourceDir)
 
 	if len(local) == 0 {
 		fmt.Println("  No git repositories found")
