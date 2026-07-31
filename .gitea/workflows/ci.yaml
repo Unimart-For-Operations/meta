@@ -13,14 +13,12 @@ jobs:
     container:
       image: golang:1.25
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: /go/pkg/mod
-          key: go-mod-${{ hashFiles('go.sum') }}
-          restore-keys: go-mod-
+      - name: Checkout
+        run: |
+          host="${GITHUB_SERVER_URL#https://}"
+          host="${host#http://}"
+          host="${host%/}"
+          git clone --depth 1 "http://x-access-token:${GITHUB_TOKEN}@${host}/${GITHUB_REPOSITORY}.git" .
 
       - name: go build
         run: go build ./...
