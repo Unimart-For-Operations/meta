@@ -27,16 +27,16 @@ SUBMODULES := $(shell git config --file .gitmodules --get-regexp path 2>/dev/nul
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE    := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS := -X github.com/idpbuilder/meta/cmd.Version=$(VERSION) \
-           -X github.com/idpbuilder/meta/cmd.GitCommit=$(COMMIT) \
-           -X github.com/idpbuilder/meta/cmd.BuildDate=$(DATE)
+LDFLAGS := -X github.com/Unimart-For-Operations/meta/cmd.Version=$(VERSION) \
+           -X github.com/Unimart-For-Operations/meta/cmd.GitCommit=$(COMMIT) \
+           -X github.com/Unimart-For-Operations/meta/cmd.BuildDate=$(DATE)
 
 # Delegate to unimart when available (installed by make init / make install)
 HAS_UNIMART := $(shell command -v unimart 2>/dev/null)
 
 help: ## Show this help message
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@printf "$(BOLD)idpbuilder/meta — Org Coordination$(RESET)\n"
+	@printf "$(BOLD)Unimart-For-Operations/meta — Org Coordination$(RESET)\n"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@printf "$(BOLD)Setup:$(RESET)\n"
@@ -139,10 +139,10 @@ bootstrap: ## Initialize submodules and install hooks across all repos
 	for mod in $(SUBMODULES); do \
 		if [ -d "$$mod/.git" ] || [ -f "$$mod/.git" ]; then \
 			REMOTE=$$(git -C "$$mod" remote get-url origin 2>/dev/null); \
-			if echo "$$REMOTE" | grep -q 'github.com[:/]idpbuilder/'; then \
+			if echo "$$REMOTE" | grep -q 'github.com[:/]Unimart-For-Operations/'; then \
 				printf "  $(PASS) $$mod → $$REMOTE\n"; \
 			else \
-				printf "  $(FAIL) $$mod → $$REMOTE (expected github.com:idpbuilder/)\n"; \
+				printf "  $(FAIL) $$mod → $$REMOTE (expected github.com:Unimart-For-Operations/)\n"; \
 				ERRORS=$$((ERRORS + 1)); \
 			fi; \
 		else \
@@ -309,7 +309,7 @@ else
 	printf "$(BOLD)[2/6] Remote URLs (security check)$(RESET)\n"; \
 	for mod in $(SUBMODULES); do \
 		REMOTE=$$(git -C "$$mod" remote get-url origin 2>/dev/null); \
-		if echo "$$REMOTE" | grep -q 'github.com[:/]idpbuilder/'; then \
+		if echo "$$REMOTE" | grep -q 'github.com[:/]Unimart-For-Operations/'; then \
 			printf "  $(PASS) $$mod → idpbuilder org\n"; \
 		else \
 			printf "  $(FAIL) $$mod → $$REMOTE (UNEXPECTED REMOTE)\n"; \

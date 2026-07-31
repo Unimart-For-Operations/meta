@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/idpbuilder/meta/internal/prereqs"
+	"github.com/Unimart-For-Operations/meta/internal/prereqs"
 	"github.com/spf13/cobra"
 )
 

@@ -10,9 +10,9 @@ Each entry is a symlink to the corresponding submodule directory at the org root
 
 | Symlink | Target | Gitea repo |
 |---------|--------|------------|
-| `cmdr` | `../cmdr` | `idpbuilder/cmdr` |
-| `idpbuilder` | `../idpbuilder` | `idpbuilder/idpbuilder` |
-| `meta` | `../` (meta itself) | `idpbuilder/meta` |
+| `cmdr` | `../cmdr` | `Unimart-For-Operations/cmdr` |
+| `idpbuilder` | `../idpbuilder` | `Unimart-For-Operations/idpbuilder` |
+| `meta` | `../` (meta itself) | `Unimart-For-Operations/meta` |
 
 Symlinks are used to avoid duplicate clones — the submodule directories at the org root
 are the canonical local copies. `unimart` resolves symlinks when scanning for `.git` entries.

@@ -158,9 +158,9 @@ if command -v go &>/dev/null; then
 	UNIMART_VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
 	UNIMART_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 	UNIMART_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	UNIMART_LDFLAGS="-X github.com/idpbuilder/meta/cmd.Version=${UNIMART_VERSION}"
-	UNIMART_LDFLAGS="${UNIMART_LDFLAGS} -X github.com/idpbuilder/meta/cmd.GitCommit=${UNIMART_COMMIT}"
-	UNIMART_LDFLAGS="${UNIMART_LDFLAGS} -X github.com/idpbuilder/meta/cmd.BuildDate=${UNIMART_DATE}"
+	UNIMART_LDFLAGS="-X github.com/Unimart-For-Operations/meta/cmd.Version=${UNIMART_VERSION}"
+	UNIMART_LDFLAGS="${UNIMART_LDFLAGS} -X github.com/Unimart-For-Operations/meta/cmd.GitCommit=${UNIMART_COMMIT}"
+	UNIMART_LDFLAGS="${UNIMART_LDFLAGS} -X github.com/Unimart-For-Operations/meta/cmd.BuildDate=${UNIMART_DATE}"
 
 	info "Building unimart (${UNIMART_VERSION})..."
 	go build -ldflags "${UNIMART_LDFLAGS}" -o unimart .

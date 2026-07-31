@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/idpbuilder/meta/internal/host"
+	"github.com/Unimart-For-Operations/meta/internal/host"
 	"github.com/spf13/cobra"
 )
 

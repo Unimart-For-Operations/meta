@@ -16,10 +16,10 @@ func TestClassifySubmoduleRemote(t *testing.T) {
 			label: "→ ../cmdr.git (relative)",
 		},
 		{
-			name:  "idpbuilder ssh remote",
+			name:  "legacy idpbuilder ssh remote",
 			url:   "git@github.com:idpbuilder/cmdr.git",
-			ok:    true,
-			label: "→ idpbuilder org",
+			ok:    false,
+			label: "",
 		},
 		{
 			name:  "unimart for operations ssh remote",
@@ -34,7 +34,7 @@ func TestClassifySubmoduleRemote(t *testing.T) {
 		},
 		{
 			name: "non-github remote",
-			url:  "git@gitlab.com:idpbuilder/cmdr.git",
+			url:  "git@gitlab.com:Unimart-For-Operations/cmdr.git",
 			ok:   false,
 		},
 	}

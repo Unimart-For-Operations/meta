@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/idpbuilder/meta/internal/colima"
-	"github.com/idpbuilder/meta/internal/theme"
+	"github.com/Unimart-For-Operations/meta/internal/colima"
+	"github.com/Unimart-For-Operations/meta/internal/theme"
 	"github.com/spf13/cobra"
 )
 

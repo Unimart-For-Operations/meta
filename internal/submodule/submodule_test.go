@@ -9,23 +9,23 @@ import (
 // gitmodulesContent is a realistic .gitmodules matching the org repo.
 const gitmodulesContent = `[submodule "cmdr"]
 	path = cmdr
-	url = git@github.com:idpbuilder/cmdr.git
+	url = git@github.com:Unimart-For-Operations/cmdr.git
 	ignore = dirty
 [submodule "idpbuilder"]
 	path = idpbuilder
-	url = git@github.com:idpbuilder/idpbuilder.git
+	url = git@github.com:Unimart-For-Operations/idpbuilder.git
 	ignore = dirty
 [submodule "idpctl"]
 	path = idpctl
-	url = git@github.com:idpbuilder/idpctl.git
+	url = git@github.com:Unimart-For-Operations/idpctl.git
 	ignore = dirty
 [submodule "docs"]
 	path = docs
-	url = git@github.com:idpbuilder/docs.git
+	url = git@github.com:Unimart-For-Operations/docs.git
 	ignore = dirty
 [submodule "unimart-employee-handbooks/cdc"]
 	path = unimart-employee-handbooks/cdc
-	url = git@github.com:idpbuilder/cdc.git
+	url = git@github.com:Unimart-For-Operations/cdc.git
 	ignore = dirty
 `
 
@@ -48,11 +48,11 @@ func TestParseGitmodules(t *testing.T) {
 	expected := []struct {
 		name, path, url string
 	}{
-		{"cmdr", "cmdr", "git@github.com:idpbuilder/cmdr.git"},
-		{"idpbuilder", "idpbuilder", "git@github.com:idpbuilder/idpbuilder.git"},
-		{"idpctl", "idpctl", "git@github.com:idpbuilder/idpctl.git"},
-		{"docs", "docs", "git@github.com:idpbuilder/docs.git"},
-		{"unimart-employee-handbooks/cdc", "unimart-employee-handbooks/cdc", "git@github.com:idpbuilder/cdc.git"},
+		{"cmdr", "cmdr", "git@github.com:Unimart-For-Operations/cmdr.git"},
+		{"idpbuilder", "idpbuilder", "git@github.com:Unimart-For-Operations/idpbuilder.git"},
+		{"idpctl", "idpctl", "git@github.com:Unimart-For-Operations/idpctl.git"},
+		{"docs", "docs", "git@github.com:Unimart-For-Operations/docs.git"},
+		{"unimart-employee-handbooks/cdc", "unimart-employee-handbooks/cdc", "git@github.com:Unimart-For-Operations/cdc.git"},
 	}
 
 	for i, e := range expected {

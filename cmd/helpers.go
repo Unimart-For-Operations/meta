@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/idpbuilder/meta/internal/builder"
-	"github.com/idpbuilder/meta/internal/colima"
-	"github.com/idpbuilder/meta/internal/prereqs"
+	"github.com/Unimart-For-Operations/meta/internal/builder"
+	"github.com/Unimart-For-Operations/meta/internal/colima"
+	"github.com/Unimart-For-Operations/meta/internal/prereqs"
 )
 
 // checkPlatformPrereqs runs prerequisite checks and returns an error if

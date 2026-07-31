@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/idpbuilder/meta/internal/host"
+	"github.com/Unimart-For-Operations/meta/internal/host"
 )
 
 func TestSelectApplyMode(t *testing.T) {

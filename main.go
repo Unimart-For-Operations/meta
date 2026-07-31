@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/idpbuilder/meta/cmd"
+	"github.com/Unimart-For-Operations/meta/cmd"
 )
 
 func main() {

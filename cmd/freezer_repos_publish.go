@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/idpbuilder/meta/internal/cluster"
-	"github.com/idpbuilder/meta/internal/gitea"
-	"github.com/idpbuilder/meta/internal/repos"
+	"github.com/Unimart-For-Operations/meta/internal/cluster"
+	"github.com/Unimart-For-Operations/meta/internal/gitea"
+	"github.com/Unimart-For-Operations/meta/internal/repos"
 	"github.com/spf13/cobra"
 )
 

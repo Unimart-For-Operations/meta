@@ -1,13 +1,13 @@
 # unimart
 
-Your one-stop shop for the [idpbuilder](https://github.com/idpbuilder) organization. A unified CLI that manages workstation configuration, IDP platform lifecycle, documentation, and cross-repo coordination.
+Your one-stop shop for the [Unimart-For-Operations](https://github.com/Unimart-For-Operations) organization. A unified CLI that manages workstation configuration, IDP platform lifecycle, documentation, and cross-repo coordination.
 
 See [TOOLING.md](TOOLING.md) for the boundary between `unimart`, Make, CI, and shell completion. See [PROVISIONING.md](PROVISIONING.md) for the physical-host provisioning contract.
 
 ## Quick Start
 
 ```bash
-git clone --recurse-submodules git@github.com:idpbuilder/meta.git
+git clone --recurse-submodules git@github.com:Unimart-For-Operations/meta.git
 cd meta
 make init
 ```

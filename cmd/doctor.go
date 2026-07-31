@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/idpbuilder/meta/internal/host"
-	"github.com/idpbuilder/meta/internal/platform"
+	"github.com/Unimart-For-Operations/meta/internal/host"
+	"github.com/Unimart-For-Operations/meta/internal/platform"
 	"github.com/spf13/cobra"
 )
 

@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/idpbuilder/meta/internal/platform"
+	"github.com/Unimart-For-Operations/meta/internal/platform"
 )
 
 // CheckResult represents the outcome of a prerequisite check.

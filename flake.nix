@@ -35,9 +35,9 @@
             ldflags = [
               "-s"
               "-w"
-              "-X github.com/idpbuilder/meta/cmd.Version=${version}"
-              "-X github.com/idpbuilder/meta/cmd.GitCommit=${version}"
-              "-X github.com/idpbuilder/meta/cmd.BuildDate=1970-01-01T00:00:00Z"
+              "-X github.com/Unimart-For-Operations/meta/cmd.Version=${version}"
+              "-X github.com/Unimart-For-Operations/meta/cmd.GitCommit=${version}"
+              "-X github.com/Unimart-For-Operations/meta/cmd.BuildDate=1970-01-01T00:00:00Z"
             ];
 
             postInstall = ''
@@ -46,7 +46,7 @@
 
             meta = with pkgs.lib; {
               description = "Unified CLI for the idpbuilder organization";
-              homepage = "https://github.com/idpbuilder/meta";
+              homepage = "https://github.com/Unimart-For-Operations/meta";
               license = licenses.asl20;
               mainProgram = "unimart";
             };

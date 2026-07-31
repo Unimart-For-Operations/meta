@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/idpbuilder/meta/internal/cluster"
-	"github.com/idpbuilder/meta/internal/colima"
-	"github.com/idpbuilder/meta/internal/prereqs"
+	"github.com/Unimart-For-Operations/meta/internal/cluster"
+	"github.com/Unimart-For-Operations/meta/internal/colima"
+	"github.com/Unimart-For-Operations/meta/internal/prereqs"
 	"github.com/spf13/cobra"
 )
 

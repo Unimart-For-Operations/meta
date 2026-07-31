@@ -1,4 +1,4 @@
-module github.com/idpbuilder/meta
+module github.com/Unimart-For-Operations/meta
 
 go 1.25.5
 

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/idpbuilder/meta/internal/submodule"
+	"github.com/Unimart-For-Operations/meta/internal/submodule"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ var requiredDocDirs = []string{"Contributing", "Getting-Started", "Reference"}
 var requiredMakeTargets = []string{"help", "hooks"}
 
 // allowedSubmoduleGitHubOrgs are approved GitHub orgs for absolute submodule remotes.
-var allowedSubmoduleGitHubOrgs = []string{"idpbuilder", "Unimart-For-Operations"}
+var allowedSubmoduleGitHubOrgs = []string{"Unimart-For-Operations"}
 
 func runStockroomCheck(cmd *cobra.Command, args []string) error {
 	dir, err := resolveOrgDir()
@@ -49,7 +49,7 @@ func runStockroomCheck(cmd *cobra.Command, args []string) error {
 	fmtStr := fmt.Sprintf("  %%s %%-%ds %%s\n", width)
 
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("%s\n", bold("idpbuilder — Contract Validation"))
+	fmt.Printf("%s\n", bold("Unimart-For-Operations — Contract Validation"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
 

@@ -1,6 +1,6 @@
 # idpbuilder Organization
 
-This is the meta coordination repo and unified CLI (`unimart`) for the [idpbuilder](https://github.com/idpbuilder) GitHub organization. All component repos are tracked as git submodules (with `ignore = dirty`).
+This is the meta coordination repo and unified CLI (`unimart`) for the [Unimart-For-Operations](https://github.com/Unimart-For-Operations) GitHub organization. All component repos are tracked as git submodules (with `ignore = dirty`).
 
 ## unimart CLI
 
@@ -49,13 +49,13 @@ unimart is distributed through three channels:
 
 | Channel | Mechanism | When |
 |---------|-----------|------|
-| **Nix (primary)** | cmdr's flake imports `github:idpbuilder/meta` and includes `unimart` in `home.packages` via `04-modules/cli/graduated/unimart/` | Every `make switch` on every host |
+| **Nix (primary)** | cmdr's flake imports `github:Unimart-For-Operations/meta` and includes `unimart` in `home.packages` via `04-modules/cli/graduated/unimart/` | Every `make switch` on every host |
 | **make init** | `scripts/setup.sh` step 6/7 builds from source, symlinks to `~/.local/bin/` | Fresh clones before Nix is configured |
 | **make install** | `go build` + symlink to `~/.local/bin/unimart` | Development iteration |
 
 ### Nix distribution details
 
-The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's flake references it as a flake input (`meta.url = "github:idpbuilder/meta"`). The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
+The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's flake references it as a flake input (`meta.url = "github:Unimart-For-Operations/meta"`). The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
 
 **Version pinning**: cmdr's `flake.lock` pins the meta commit. To bump: push meta changes, then run `nix flake update meta` in cmdr + `make switch`.
 
