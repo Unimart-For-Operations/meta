@@ -29,3 +29,13 @@ func TestLoadFromOrg_Fallback(t *testing.T) {
 		t.Fatalf("unexpected fg: %s", tObj.Semantic["fg"])
 	}
 }
+
+func TestDMSThemePaths(t *testing.T) {
+	k9s, tmux := DMSThemePaths("/home/example")
+	if k9s != "/home/example/.config/k9s/skins/dank.yaml" {
+		t.Fatalf("unexpected k9s path: %s", k9s)
+	}
+	if tmux != "/home/example/.config/tmux/dank-theme.conf" {
+		t.Fatalf("unexpected tmux path: %s", tmux)
+	}
+}

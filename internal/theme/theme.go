@@ -61,6 +61,16 @@ func parseTheme(b []byte) (*Theme, error) {
 	return &t, nil
 }
 
+// DMSThemePaths returns the paths where DMS's matugen writes the k9s skin and
+// tmux theme on DMS hosts. These are regenerated on every wallpaper/theme
+// change, so they reflect the host's active DMS theme. The files may not exist
+// yet (e.g. first boot before matugen has run); callers should fall back to the
+// static Catppuccin export when they don't.
+func DMSThemePaths(homeDir string) (k9s, tmux string) {
+	return filepath.Join(homeDir, ".config", "k9s", "skins", "dank.yaml"),
+		filepath.Join(homeDir, ".config", "tmux", "dank-theme.conf")
+}
+
 // GenerateTmuxStatus returns a simple tmux status-right snippet using
 // the theme's semantic colors. This is a minimal example for testing.
 func GenerateTmuxStatus(t *Theme) string {

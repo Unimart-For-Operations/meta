@@ -83,27 +83,8 @@ func runFreezerUp(cmd *cobra.Command, args []string) error {
 	genOut := filepath.Join(orgDir, ".workspace", "generated")
 	if err := os.MkdirAll(genOut, 0755); err != nil {
 		fmt.Printf("warning: failed to create generated output dir: %v\n", err)
-	} else {
-		t, err := theme.LoadFromOrg(orgDir, "catppuccin-frappe")
-		if err != nil {
-			fmt.Printf("warning: failed to load theme: %v\n", err)
-		} else {
-			tmuxSnippet := theme.GenerateTmuxStatus(t)
-			tmuxPath := filepath.Join(genOut, "tmux-theme.conf")
-			if err := os.WriteFile(tmuxPath, []byte(tmuxSnippet+"\n"), 0644); err != nil {
-				fmt.Printf("warning: failed to write %s: %v\n", tmuxPath, err)
-			} else {
-				fmt.Printf("wrote %s\n", tmuxPath)
-			}
-
-			skin := theme.GenerateK9sSkin(t)
-			skinPath := filepath.Join(genOut, "k9s-skin.yaml")
-			if err := os.WriteFile(skinPath, []byte(skin+"\n"), 0644); err != nil {
-				fmt.Printf("warning: failed to write %s: %v\n", skinPath, err)
-			} else {
-				fmt.Printf("wrote %s\n", skinPath)
-			}
-		}
+	} else if err := writeWorkspaceThemes(orgDir, genOut); err != nil {
+		fmt.Printf("warning: failed to generate dev theme files: %v\n", err)
 	}
 
 	// Step 4: Create IDP
@@ -143,6 +124,59 @@ func runFreezerUp(cmd *cobra.Command, args []string) error {
 			fmt.Printf("warning: publish step failed: %v\n", err)
 		}
 	}
+
+	return nil
+}
+
+// writeWorkspaceThemes writes the tmux/k9s theme files used by the IDP
+// workspace. On DMS hosts it copies the matugen-generated themes (which reflect
+// the active wallpaper theme, regenerated on every theme change), falling back
+// to the static Catppuccin export otherwise.
+func writeWorkspaceThemes(orgDir, genOut string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("determining home dir: %w", err)
+	}
+
+	// DMS hosts: k9s/tmux colors are owned by matugen (~/.config/k9s/skins/dank.yaml,
+	// ~/.config/tmux/dank-theme.conf). Prefer those when present.
+	dmsK9s, dmsTmux := theme.DMSThemePaths(home)
+	wroteAny := false
+	for _, pair := range []struct{ src, dst string }{
+		{src: dmsTmux, dst: "tmux-theme.conf"},
+		{src: dmsK9s, dst: "k9s-skin.yaml"},
+	} {
+		if b, err := os.ReadFile(pair.src); err == nil {
+			dst := filepath.Join(genOut, pair.dst)
+			if err := os.WriteFile(dst, b, 0644); err != nil {
+				fmt.Printf("warning: failed to write %s: %v\n", dst, err)
+			} else {
+				fmt.Printf("wrote %s (DMS matugen)\n", dst)
+				wroteAny = true
+			}
+		}
+	}
+	if wroteAny {
+		return nil
+	}
+
+	// Non-DMS fallback: export the static Catppuccin theme.
+	t, err := theme.LoadFromOrg(orgDir, "catppuccin-frappe")
+	if err != nil {
+		return fmt.Errorf("loading theme: %w", err)
+	}
+
+	tmuxPath := filepath.Join(genOut, "tmux-theme.conf")
+	if err := os.WriteFile(tmuxPath, []byte(theme.GenerateTmuxStatus(t)+"\n"), 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", tmuxPath, err)
+	}
+	fmt.Printf("wrote %s\n", tmuxPath)
+
+	skinPath := filepath.Join(genOut, "k9s-skin.yaml")
+	if err := os.WriteFile(skinPath, []byte(theme.GenerateK9sSkin(t)+"\n"), 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", skinPath, err)
+	}
+	fmt.Printf("wrote %s\n", skinPath)
 
 	return nil
 }
