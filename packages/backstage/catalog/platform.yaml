@@ -1,0 +1,130 @@
+---
+# Platform System - IDP components
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: idp-platform
+  description: Internal Developer Platform - Kubernetes-based development infrastructure
+  tags:
+    - platform
+    - infrastructure
+    - idp
+spec:
+  owner: platform-team
+  domain: infrastructure
+
+---
+# Gitea Component - In-cluster Git Server
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gitea
+  description: In-cluster Git server for source code management
+  annotations:
+    backstage.io/kubernetes-id: gitea
+    backstage.io/kubernetes-namespace: gitea
+  links:
+    - url: http://gitea.cnoe.localtest.me
+      title: Gitea Web UI
+      icon: web
+  tags:
+    - git
+    - scm
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: idp-platform
+  providesApis: []
+
+---
+# ArgoCD Component - GitOps Deployment Engine
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: argocd
+  description: GitOps continuous delivery tool for Kubernetes
+  annotations:
+    backstage.io/kubernetes-id: argocd
+    backstage.io/kubernetes-namespace: argocd
+    argocd/app-name: argocd
+  links:
+    - url: https://argocd.cnoe.localtest.me
+      title: ArgoCD Web UI
+      icon: web
+  tags:
+    - gitops
+    - deployment
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: idp-platform
+  providesApis: []
+
+---
+# Backstage Component - Developer Portal
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage
+  description: Developer portal and service catalog
+  annotations:
+    backstage.io/kubernetes-id: backstage
+    backstage.io/kubernetes-namespace: backstage
+  links:
+    - url: http://backstage.cnoe.localtest.me
+      title: Backstage Web UI
+      icon: web
+  tags:
+    - portal
+    - catalog
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: idp-platform
+  providesApis: []
+
+---
+# Ingress NGINX Component
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ingress-nginx
+  description: Kubernetes ingress controller using NGINX
+  annotations:
+    backstage.io/kubernetes-id: ingress-nginx
+    backstage.io/kubernetes-namespace: ingress-nginx
+  tags:
+    - networking
+    - ingress
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: idp-platform
+
+---
+# PostgreSQL Resource - Backstage Database
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: backstage-postgresql
+  description: PostgreSQL database for Backstage
+  annotations:
+    backstage.io/kubernetes-id: backstage-platform-postgresql
+    backstage.io/kubernetes-namespace: backstage
+  tags:
+    - database
+    - postgresql
+spec:
+  type: database
+  owner: platform-team
+  system: idp-platform
+  dependsOn:
+    - component:backstage

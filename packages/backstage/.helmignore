@@ -1,0 +1,5 @@
+# Helm ignore patterns
+catalog/
+scaffolder-templates/
+*.md
+.git*

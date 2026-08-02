@@ -1,0 +1,129 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: go-fiber-api
+  title: Go Fiber API Service
+  description: Create a new Go REST API using the Fiber web framework with best practices
+  tags:
+    - go
+    - fiber
+    - api
+    - rest
+    - microservice
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Service Information
+      required:
+        - name
+        - description
+      properties:
+        name:
+          title: Service Name
+          type: string
+          description: Unique name for this service (lowercase, hyphens allowed)
+          pattern: '^[a-z][a-z0-9-]*$'
+          ui:autofocus: true
+          ui:help: 'Example: user-service, order-api'
+        
+        description:
+          title: Description
+          type: string
+          description: Short description of what this service does
+          ui:help: 'Example: REST API for managing user accounts'
+        
+        owner:
+          title: Owner
+          type: string
+          description: Team or user responsible for this service
+          default: platform-team
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+
+    - title: Configuration
+      required:
+        - port
+      properties:
+        port:
+          title: Service Port
+          type: integer
+          description: HTTP port the service will listen on
+          default: 8080
+          minimum: 1024
+          maximum: 65535
+        
+        enableMetrics:
+          title: Enable Prometheus Metrics
+          type: boolean
+          description: Add /metrics endpoint for Prometheus
+          default: true
+        
+        enableHealthChecks:
+          title: Enable Health Checks
+          type: boolean
+          description: Add /health and /ready endpoints
+          default: true
+        
+        enableCORS:
+          title: Enable CORS
+          type: boolean
+          description: Configure Cross-Origin Resource Sharing
+          default: true
+
+    - title: Repository
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - my-gitea-http.gitea.svc.cluster.local:3000
+            allowedOwners:
+              - giteaAdmin
+
+  steps:
+    - id: fetch-base
+      name: Fetch Base Template
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          port: ${{ parameters.port }}
+          enableMetrics: ${{ parameters.enableMetrics }}
+          enableHealthChecks: ${{ parameters.enableHealthChecks }}
+          enableCORS: ${{ parameters.enableCORS }}
+          destination: ${{ parameters.repoUrl | parseRepoUrl }}
+
+    - id: publish
+      name: Publish to Gitea
+      action: publish:gitea
+      input:
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: public
+
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

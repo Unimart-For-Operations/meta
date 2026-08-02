@@ -1,0 +1,40 @@
+---
+# Platform Team - Owns IDP infrastructure
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  description: Platform engineering team responsible for IDP infrastructure
+  tags:
+    - team
+    - platform
+spec:
+  type: team
+  profile:
+    displayName: Platform Team
+    email: platform@unimart.local
+  children: []
+
+---
+# Engineering Domain
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: infrastructure
+  description: Infrastructure and platform services domain
+spec:
+  owner: platform-team
+
+---
+# Default User - Platform Admin
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: platform-admin
+  description: Platform administrator
+spec:
+  profile:
+    displayName: Platform Administrator
+    email: admin@unimart.local
+  memberOf:
+    - platform-team
