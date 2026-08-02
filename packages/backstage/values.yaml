@@ -8,7 +8,7 @@ backstage:
     registry: docker.io
     repository: library/backstage-platform
     tag: "latest"
-    pullPolicy: IfNotPresent
+    pullPolicy: Never
 
   replicas: 1
 
