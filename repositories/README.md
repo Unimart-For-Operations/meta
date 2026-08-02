@@ -11,6 +11,7 @@ Each entry is a symlink to the corresponding submodule directory at the org root
 | Symlink | Target | Gitea repo |
 |---------|--------|------------|
 | `cmdr` | `../cmdr` | `Unimart-For-Operations/cmdr` |
+| `docs-service` | `../docs-service` | `Unimart-For-Operations/docs-service` |
 | `idpbuilder` | `../idpbuilder` | `Unimart-For-Operations/idpbuilder` |
 | `meta` | `../` (meta itself) | `Unimart-For-Operations/meta` |
 

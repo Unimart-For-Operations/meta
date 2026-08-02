@@ -33,3 +33,6 @@ credentials.json
 !.env.example
 repositories/backstage-platform/
 repositories/backstage-templates/
+
+# Pending submodule registration (needs GitHub repo + gh auth)
+/docs-service/

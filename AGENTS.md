@@ -9,7 +9,7 @@ The `unimart` binary is a Go CLI built from this repo. It is the primary interfa
 | Aisle | Domain | Key Commands |
 |-------|--------|--------------|
 | `deli` | Workstation config (Nix/HM) | `switch`, `doctor`, `bootstrap`, `hosts` |
-| `freezer` | IDP platform lifecycle | `up`, `down`, `status`, `build`, `doctor`, `repos`, `repos-publish-to-gitea` |
+| `freezer` | IDP platform lifecycle | `up`, `down`, `status`, `build`, `doctor`, `repos`, `repos-publish-to-gitea`, `docs` |
 | `stockroom` | Cross-repo coordination | `check` |
 
 Top-level commands (not under any aisle):
@@ -41,6 +41,7 @@ Source layout:
 | Repo | Purpose | Language | Status |
 |------|---------|----------|--------|
 | [cmdr](cmdr/) | Nix flake + Home Manager workstation config | Nix | Active |
+| [docs-service](docs-service/) | Phoenix microservice serving org docs from Gitea (deployed via `unimart freezer docs up`, not `unimart open`) | Elixir | Active |
 | [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder (private fork of cnoe-io/idpbuilder) | Go | Active |
 
 ## Distribution
@@ -137,8 +138,9 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 │   ├── freezer_build.go                freezer build (idpbuilder make build)
 │   ├── freezer_doctor.go               freezer doctor (prerequisite checks)
 │   ├── freezer_bootstrap.go            freezer bootstrap (install prerequisites)
-│   ├── freezer_repos.go                freezer repos (list/clone/status)
+│   ├── freezer_repos.go                 freezer repos (list/clone/status)
 │   ├── freezer_repos_publish.go        freezer repos publish-to-gitea
+│   ├── freezer_docs.go                  freezer docs (up/status/down/open — docs microservice)
 │   ├── stockroom.go                     Aisle parent
 │   └── stockroom_check.go              stockroom check (CI contract validation)
 ├── internal/
@@ -169,6 +171,7 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 ├── containers/                          Test infrastructure
 ├── repositories/                        Publish-to-Gitea symlink directory
 ├── cmdr/                                Nix workstation config (submodule)
+├── docs-service/                        Phoenix docs microservice (submodule pending; see repositories/)
 └── idpbuilder/                          IDP builder (submodule)
 ```
 
