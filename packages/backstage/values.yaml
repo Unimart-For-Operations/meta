@@ -3,11 +3,11 @@
 # Enables: Software Catalog, TechDocs, Kubernetes Plugin, ArgoCD Plugin, Scaffolder
 
 backstage:
-  # Use pinned stable version
+  # Use custom built image with IDP integrations
   image:
-    registry: ghcr.io
-    repository: backstage/backstage
-    tag: "1.33.0"
+    registry: docker.io
+    repository: library/backstage-platform
+    tag: "latest"
     pullPolicy: IfNotPresent
 
   replicas: 1
