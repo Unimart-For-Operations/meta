@@ -5,7 +5,6 @@ metadata:
   name: backstage
   namespace: backstage
   annotations:
-    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 spec:
   ingressClassName: nginx
