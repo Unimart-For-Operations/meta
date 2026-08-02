@@ -112,3 +112,75 @@ func KindDeleteCluster() error {
 	}
 	return nil
 }
+
+// BuildBackstagePlatform builds the backstage-platform Docker image from source.
+// It requires Docker to be running and the backstage-platform source to exist
+// at repositories/backstage-platform/.
+func BuildBackstagePlatform(orgDir string, verbose bool) error {
+	backstageDir := filepath.Join(orgDir, "repositories", "backstage-platform")
+
+	// Check if directory exists
+	if _, err := os.Stat(backstageDir); err != nil {
+		return fmt.Errorf("backstage-platform source not found at %s", backstageDir)
+	}
+
+	// Check for Dockerfile
+	dockerfile := filepath.Join(backstageDir, "packages", "backend", "Dockerfile")
+	if _, err := os.Stat(dockerfile); err != nil {
+		return fmt.Errorf("Dockerfile not found at %s", dockerfile)
+	}
+
+	fmt.Println("  Building backstage-platform:latest...")
+
+	// Build the image
+	args := []string{
+		"build",
+		"-t", "backstage-platform:latest",
+		"-f", "packages/backend/Dockerfile",
+		".",
+	}
+
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = backstageDir
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker build failed: %w", err)
+	}
+
+	fmt.Println("  backstage-platform:latest built successfully")
+	return nil
+}
+
+// LoadImageIntoKind loads a Docker image into the Kind cluster.
+// It auto-detects the Kind cluster name (defaults to "localdev").
+func LoadImageIntoKind(image string, verbose bool) error {
+	// Detect Kind cluster name
+	out, err := exec.Command("kind", "get", "clusters").Output()
+	if err != nil {
+		return fmt.Errorf("could not list kind clusters: %w", err)
+	}
+	clusters := strings.Fields(strings.TrimSpace(string(out)))
+	if len(clusters) == 0 {
+		return fmt.Errorf("no Kind clusters found — create one first with: unimart freezer up")
+	}
+	clusterName := clusters[0]
+
+	fmt.Printf("  Loading %s into Kind cluster %s...\n", image, clusterName)
+
+	cmd := exec.Command("kind", "load", "docker-image", image, "--name", clusterName)
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("kind load docker-image failed: %w", err)
+	}
+
+	fmt.Printf("  %s loaded successfully\n", image)
+	return nil
+}

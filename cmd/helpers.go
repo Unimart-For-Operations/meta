@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/Unimart-For-Operations/meta/internal/builder"
@@ -132,4 +134,54 @@ func idpCreateArgs(packagesDir string, extraArgs []string) []string {
 
 func dockerEndpointIsPodman() bool {
 	return strings.Contains(os.Getenv("DOCKER_HOST"), "/podman/")
+}
+
+// buildCustomImages builds custom container images (backstage-platform).
+// It skips gracefully if the source directory doesn't exist.
+func buildCustomImages(stepLabel, orgDir string, skipBuild bool) error {
+	fmt.Printf("\n%s Building custom container images\n\n", bold(stepLabel))
+
+	if skipBuild {
+		fmt.Println("  Skipping build (--skip-build)")
+		return nil
+	}
+
+	// Check if backstage-platform exists
+	backstageDir := filepath.Join(orgDir, "repositories", "backstage-platform")
+	if _, err := os.Stat(backstageDir); err != nil {
+		fmt.Printf("  %s backstage-platform not found, skipping\n", warn("[warn]"))
+		return nil
+	}
+
+	// Build backstage-platform image
+	if err := builder.BuildBackstagePlatform(orgDir, verbose); err != nil {
+		return fmt.Errorf("backstage-platform build failed: %w", err)
+	}
+
+	fmt.Printf("  %s all custom images built\n", pass("[ok]"))
+	return nil
+}
+
+// loadCustomImages loads custom container images into the Kind cluster.
+// It checks if images exist locally before attempting to load them.
+func loadCustomImages(stepLabel string) error {
+	fmt.Printf("\n%s Loading custom images into Kind\n\n", bold(stepLabel))
+
+	images := []string{"backstage-platform:latest"}
+
+	for _, img := range images {
+		// Check if image exists locally
+		cmd := exec.Command("docker", "image", "inspect", img)
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("  %s %s not found locally, skipping\n", warn("[warn]"), img)
+			continue
+		}
+
+		if err := builder.LoadImageIntoKind(img, verbose); err != nil {
+			return fmt.Errorf("failed to load %s: %w", img, err)
+		}
+	}
+
+	fmt.Printf("  %s all custom images loaded\n", pass("[ok]"))
+	return nil
 }

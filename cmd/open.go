@@ -21,9 +21,10 @@ const (
 )
 
 var (
-	openSkipBuild bool
-	openNoBrowser bool
-	openRecreate  bool
+	openSkipBuild     bool
+	openNoBrowser     bool
+	openRecreate      bool
+	openRebuildImages bool
 )
 
 var openCmd = &cobra.Command{
@@ -31,13 +32,14 @@ var openCmd = &cobra.Command{
 	Short: "Open for business — bring the full IDP platform online",
 	Long: `One command to bring the entire org's IDP online locally.
 
-Performs a 6-step startup sequence:
+Performs a 7-step startup sequence:
   1. Check prerequisites (Go, Docker, Kind, kubectl)
   2. Start container runtime (Colima on macOS)
   3. Build idpbuilder from source (unless --skip-build)
-  4. Create IDP platform (ArgoCD + Gitea + nginx on Kind)
-  5. Publish all org repos to in-cluster Gitea
-  6. Open ArgoCD dashboard in browser
+  4. Build custom images (backstage-platform, unless --skip-build)
+  5. Create IDP platform (ArgoCD + Gitea + nginx on Kind)
+  6. Load custom images into Kind
+  7. Publish all org repos to in-cluster Gitea + open browser
 
 Opinionated defaults: dev password enabled, exit-after-sync mode,
 all org repos published to Gitea via HTTPS.
@@ -47,9 +49,10 @@ Extra arguments after -- are passed through to idpbuilder create.`,
 }
 
 func init() {
-	openCmd.Flags().BoolVar(&openSkipBuild, "skip-build", false, "Skip the idpbuilder build step")
+	openCmd.Flags().BoolVar(&openSkipBuild, "skip-build", false, "Skip the idpbuilder and custom image build steps")
 	openCmd.Flags().BoolVar(&openNoBrowser, "no-browser", false, "Don't auto-open the ArgoCD dashboard")
 	openCmd.Flags().BoolVar(&openRecreate, "recreate", false, "Tear down existing cluster first, then recreate")
+	openCmd.Flags().BoolVar(&openRebuildImages, "rebuild-images", false, "Force rebuild of custom images even if they exist")
 	rootCmd.AddCommand(openCmd)
 }
 
@@ -62,7 +65,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 
 	// --recreate: tear down first
 	if openRecreate {
-		fmt.Printf("%s Tearing down existing cluster\n\n", bold("[0/6]"))
+		fmt.Printf("%s Tearing down existing cluster\n\n", bold("[0/7]"))
 		if err := builder.Delete(idpDir); err != nil {
 			// Non-fatal: cluster may not exist yet
 			fmt.Printf("  %s teardown: %v (continuing)\n", warn("[warn]"), err)
@@ -73,23 +76,29 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 1: Check prerequisites
-	fmt.Printf("%s Checking prerequisites\n\n", bold("[1/6]"))
+	fmt.Printf("%s Checking prerequisites\n\n", bold("[1/7]"))
 	if err := checkPlatformPrereqs(); err != nil {
 		return err
 	}
 
 	// Step 2: Ensure Docker daemon is reachable
-	if err := ensureDocker("[2/6]", nil); err != nil {
+	if err := ensureDocker("[2/7]", nil); err != nil {
 		return err
 	}
 
 	// Step 3: Build idpbuilder
-	if err := buildIdpbuilder(idpDir, "[3/6]", openSkipBuild); err != nil {
+	if err := buildIdpbuilder(idpDir, "[3/7]", openSkipBuild); err != nil {
 		return err
 	}
 
-	// Step 4: Create IDP platform with opinionated defaults
-	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[4/6]"))
+	// Step 4: Build custom images
+	skipImageBuild := openSkipBuild && !openRebuildImages
+	if err := buildCustomImages("[4/7]", orgDir, skipImageBuild); err != nil {
+		return err
+	}
+
+	// Step 5: Create IDP platform with opinionated defaults
+	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[5/7]"))
 
 	// Resolve packages dir (may not exist yet — that's fine, idpbuilder handles it)
 	packagesDir := filepath.Join(orgDir, "packages")
@@ -100,8 +109,13 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  %s IDP platform running\n", pass("[ok]"))
 
-	// Step 5: Publish all org repos to in-cluster Gitea
-	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[5/6]"))
+	// Step 6: Load custom images into Kind
+	if err := loadCustomImages("[6/7]"); err != nil {
+		return err
+	}
+
+	// Step 7: Publish all org repos to in-cluster Gitea
+	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[7/7]"))
 
 	token, err := cluster.GetGiteaAdminToken(defaultGiteaURL)
 	if err != nil {
@@ -124,9 +138,8 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Step 6: Open browser
-	fmt.Printf("\n%s Opening ArgoCD dashboard\n\n", bold("[6/6]"))
-
+	// Open browser
+	fmt.Println()
 	if openNoBrowser {
 		fmt.Println("  Skipping browser (--no-browser)")
 	} else {
