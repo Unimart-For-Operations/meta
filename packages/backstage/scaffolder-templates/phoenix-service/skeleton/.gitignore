@@ -1,0 +1,12 @@
+/_build/
+/deps/
+/doc/
+erl_crash.dump
+*.ez
+/tmp/
+.nix-mix/
+.nix-hex/
+.direnv/
+result
+.env
+.env.*
