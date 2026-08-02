@@ -1,267 +1,276 @@
 # Backstage Platform - Full IDP Integration
 # Integrates with: Gitea, ArgoCD, Kubernetes
 # Enables: Software Catalog, TechDocs, Kubernetes Plugin, ArgoCD Plugin, Scaffolder
+#
+# NOTE on nesting: this chart wraps the upstream backstage chart as a
+# dependency named "backstage", so the outer `backstage:` key is the
+# subchart's values scope and pod-level settings live under
+# `backstage.backstage:` (matching the upstream chart's own layout).
 
 backstage:
-  # Use custom built image with IDP integrations
-  image:
-    registry: docker.io
-    repository: library/backstage-platform
-    tag: "latest"
-    pullPolicy: Never
+  backstage:
+    # Use custom built image with IDP integrations
+    image:
+      registry: docker.io
+      repository: library/backstage-platform
+      tag: "latest"
+      pullPolicy: Never
 
-  replicas: 1
+    replicas: 1
 
-  # Deployment strategy - use Recreate to avoid concurrent DB migrations
-  strategy:
-    type: Recreate
+    # Deployment strategy - use Recreate to avoid concurrent DB migrations
+    strategy:
+      type: Recreate
+
+    # Resource limits
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+    # Probes - adjust initial delay for slower starts
+    livenessProbe:
+      httpGet:
+        path: /.backstage/health/v1/liveness
+        port: 7007
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+
+    readinessProbe:
+      httpGet:
+        path: /.backstage/health/v1/readiness
+        port: 7007
+        scheme: HTTP
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+
+    startupProbe:
+      httpGet:
+        path: /.backstage/health/v1/liveness
+        port: 7007
+        scheme: HTTP
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 30
+
+    # Environment variables from secrets
+    extraEnvVarsSecrets:
+      - backstage-secrets
+
+    # Mount catalog files
+    extraVolumeMounts:
+      - name: catalog-files
+        mountPath: /app/catalog
+        readOnly: true
+
+    extraVolumes:
+      - name: catalog-files
+        configMap:
+          name: backstage-catalog
+
+    # Backstage application configuration
+    appConfig:
+      app:
+        title: IDP Platform
+        baseUrl: http://backstage.cnoe.localtest.me
+
+      organization:
+        name: Unimart-For-Operations
+
+      backend:
+        baseUrl: http://backstage.cnoe.localtest.me
+        listen:
+          port: 7007
+
+        # CORS configuration
+        cors:
+          origin: http://backstage.cnoe.localtest.me
+          methods: [GET, POST, PUT, DELETE]
+          credentials: true
+
+        # Database connection (PostgreSQL subchart)
+        database:
+          client: pg
+          connection:
+            host: ${POSTGRES_HOST}
+            port: ${POSTGRES_PORT}
+            user: ${POSTGRES_USER}
+            password: ${POSTGRES_PASSWORD}
+
+        # Cache configuration
+        cache:
+          store: memory
+
+        # Reading configuration
+        reading:
+          allow:
+            - host: "*.cnoe.localtest.me"
+            - host: "*.cnoe.localtest.me:8443"
+            - host: "my-gitea-http.gitea.svc.cluster.local:3000"
+            - host: "*.gitea.svc.cluster.local"
+
+      # Integrations - Gitea SCM
+      integrations:
+        gitea:
+          - host: my-gitea-http.gitea.svc.cluster.local:3000
+            baseUrl: http://my-gitea-http.gitea.svc.cluster.local:3000
+            username: giteaAdmin
+            password: ${GITEA_TOKEN}
+
+      # Proxy configuration for accessing external services
+      proxy:
+        '/argocd/api':
+          target: https://argocd-server.argocd.svc.cluster.local/api/v1/
+          changeOrigin: true
+          secure: false
+          headers:
+            Cookie:
+              $env: ARGOCD_AUTH_TOKEN
+
+      # Software Catalog configuration
+      catalog:
+        # Import static catalog files
+        locations:
+          - type: file
+            target: /app/catalog/platform.yaml
+          - type: file
+            target: /app/catalog/organization.yaml
+          # External scaffolder templates from Gitea
+          - type: url
+            target: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/backstage-templates/raw/branch/main/go-fiber-api/template.yaml
+            rules:
+              - allow: [Template]
+          - type: url
+            target: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/backstage-templates/raw/branch/main/phoenix-service/template.yaml
+            rules:
+              - allow: [Template]
+          # Org services (deployed deliberately, e.g. unimart freezer docs up)
+          - type: url
+            target: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/docs-service/raw/branch/main/catalog-info.yaml
+            rules:
+              - allow: [Component]
+
+        # Catalog processing rules
+        rules:
+          - allow: [Component, System, API, Resource, Location, User, Group, Template]
+
+        # Processors
+        processors:
+          githubOrg:
+            providers:
+              - id: production
+
+        # Gitea discovery provider
+        providers:
+          gitea:
+            giteaHost:
+              host: my-gitea-http.gitea.svc.cluster.local:3000
+              catalog:
+                branch: main
+                catalogFile: catalog-info.yaml
+
+      # Scaffolder - Software Templates
+      scaffolder:
+        defaultAuthor:
+          name: IDP Platform
+          email: platform@unimart.local
+        defaultCommitMessage: 'Initial commit (scaffolded by Backstage)'
+
+      # Authentication - start with guest access
+      auth:
+        environment: development
+        providers:
+          guest:
+            dangerouslyAllowOutsideDevelopment: true
+
+      # TechDocs - Documentation
+      techdocs:
+        builder: 'local'
+        generator:
+          runIn: 'local'
+        publisher:
+          type: 'local'
+
+      # Kubernetes plugin configuration
+      kubernetes:
+        serviceLocatorMethod:
+          type: 'multiTenant'
+        clusterLocatorMethods:
+          - type: 'config'
+            clusters:
+              - name: local-kind
+                url: https://kubernetes.default.svc
+                authProvider: 'serviceAccount'
+                skipTLSVerify: true
+                skipMetricsLookup: false
+                dashboardUrl: http://localhost:9090  # Optional: k8s dashboard
+                dashboardApp: standard
+
+      # ArgoCD plugin configuration
+      argocd:
+        username: admin
+        password: ${ARGOCD_ADMIN_PASSWORD}
+        appLocatorMethods:
+          - type: 'config'
+            instances:
+              - name: main
+                url: https://argocd-server.argocd.svc.cluster.local
+                username: admin
+                password: ${ARGOCD_ADMIN_PASSWORD}
 
   # ServiceAccount with Kubernetes RBAC
   serviceAccount:
     create: false  # Created via templates/rbac.yaml
     name: backstage
 
-  # Resource limits
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "250m"
-    limits:
-      memory: "2Gi"
-      cpu: "1000m"
-
-  # Probes - adjust initial delay for slower starts
-  livenessProbe:
-    httpGet:
-      path: /healthcheck
-      port: 7007
-      scheme: HTTP
-    initialDelaySeconds: 60
-    periodSeconds: 10
-    timeoutSeconds: 2
-    failureThreshold: 3
-
-  readinessProbe:
-    httpGet:
-      path: /healthcheck
-      port: 7007
-      scheme: HTTP
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 2
-    failureThreshold: 3
-
-  startupProbe:
-    httpGet:
-      path: /healthcheck
-      port: 7007
-      scheme: HTTP
-    initialDelaySeconds: 15
-    periodSeconds: 10
-    timeoutSeconds: 2
-    failureThreshold: 30
-
-  # Environment variables from secrets
-  extraEnvVarsSecrets:
-    - backstage-secrets
-
-  # Mount catalog files
-  extraVolumeMounts:
-    - name: catalog-files
-      mountPath: /app/catalog
-      readOnly: true
-
-  extraVolumes:
-    - name: catalog-files
-      configMap:
-        name: backstage-catalog
-
-  # Backstage application configuration
-  appConfig:
-    app:
-      title: IDP Platform
-      baseUrl: http://backstage.cnoe.localtest.me
-      
-    organization:
-      name: Unimart-For-Operations
-
-    backend:
-      baseUrl: http://backstage.cnoe.localtest.me
-      listen:
-        port: 7007
-      
-      # CORS configuration
-      cors:
-        origin: http://backstage.cnoe.localtest.me
-        methods: [GET, POST, PUT, DELETE]
-        credentials: true
-      
-      # Database connection (PostgreSQL subchart)
-      database:
-        client: pg
-        connection:
-          host: ${POSTGRES_HOST}
-          port: ${POSTGRES_PORT}
-          user: ${POSTGRES_USER}
-          password: ${POSTGRES_PASSWORD}
-          ssl:
-            require: false
-      
-      # Cache configuration
-      cache:
-        store: memory
-      
-      # Reading configuration
-      reading:
-        allow:
-          - host: "*.cnoe.localtest.me"
-          - host: "*.gitea.svc.cluster.local"
-
-    # Integrations - Gitea SCM
-    integrations:
-      gitea:
-        - host: my-gitea-http.gitea.svc.cluster.local:3000
-          baseUrl: http://my-gitea-http.gitea.svc.cluster.local:3000
-          username: giteaAdmin
-          password: ${GITEA_TOKEN}
-
-    # Proxy configuration for accessing external services
-    proxy:
-      '/argocd/api':
-        target: https://argocd-server.argocd.svc.cluster.local/api/v1/
-        changeOrigin: true
-        secure: false
-        headers:
-          Cookie:
-            $env: ARGOCD_AUTH_TOKEN
-
-    # Software Catalog configuration
-    catalog:
-      # Import static catalog files
-      locations:
-        - type: file
-          target: /app/catalog/platform.yaml
-        - type: file
-          target: /app/catalog/organization.yaml
-        # External scaffolder templates from Gitea
-        - type: url
-          target: https://gitea.cnoe.localtest.me:8443/giteaAdmin/backstage-templates/raw/branch/main/go-fiber-api/template.yaml
-          rules:
-            - allow: [Template]
-      
-      # Catalog processing rules
-      rules:
-        - allow: [Component, System, API, Resource, Location, User, Group, Template]
-      
-      # Processors
-      processors:
-        githubOrg:
-          providers:
-            - id: production
-      
-      # Gitea discovery provider
-      providers:
-        gitea:
-          giteaHost:
-            host: my-gitea-http.gitea.svc.cluster.local:3000
-            catalog:
-              branch: main
-              catalogFile: catalog-info.yaml
-
-    # Scaffolder - Software Templates
-    scaffolder:
-      defaultAuthor:
-        name: IDP Platform
-        email: platform@unimart.local
-      defaultCommitMessage: 'Initial commit (scaffolded by Backstage)'
-
-    # Authentication - start with guest access
-    auth:
-      environment: development
-      providers:
-        guest:
-          dangerouslyAllowOutsideDevelopment: true
-
-    # TechDocs - Documentation
-    techdocs:
-      builder: 'local'
-      generator:
-        runIn: 'local'
-      publisher:
-        type: 'local'
-
-    # Kubernetes plugin configuration
-    kubernetes:
-      serviceLocatorMethod:
-        type: 'multiTenant'
-      clusterLocatorMethods:
-        - type: 'config'
-          clusters:
-            - name: local-kind
-              url: https://kubernetes.default.svc
-              authProvider: 'serviceAccount'
-              skipTLSVerify: true
-              skipMetricsLookup: false
-              dashboardUrl: http://localhost:9090  # Optional: k8s dashboard
-              dashboardApp: standard
-
-    # ArgoCD plugin configuration
-    argocd:
-      username: admin
-      password: ${ARGOCD_ADMIN_PASSWORD}
-      appLocatorMethods:
-        - type: 'config'
-          instances:
-            - name: main
-              url: https://argocd-server.argocd.svc.cluster.local
-              username: admin
-              password: ${ARGOCD_ADMIN_PASSWORD}
-
-# Ingress configuration
-ingress:
-  enabled: true
-  className: nginx
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-  host: backstage.cnoe.localtest.me
-  tls:
+  # Ingress: handled by templates/ingress.yaml (custom), keep chart's disabled
+  ingress:
     enabled: false
 
-# Service configuration
-service:
-  type: ClusterIP
-  ports:
-    backend: 7007
-    name: http-backend
-    targetPort: backend
+  # Service configuration
+  service:
+    type: ClusterIP
+    ports:
+      backend: 7007
+      name: http-backend
+      targetPort: backend
 
-# PostgreSQL subchart configuration
-postgresql:
-  enabled: true
-  image:
-    registry: docker.io
-    repository: bitnamilegacy/postgresql
-    tag: "15.4.0"
-  
-  auth:
-    username: bn_backstage
-    database: backstage
-    existingSecret: backstage-secrets
-    secretKeys:
-      adminPasswordKey: POSTGRES_PASSWORD
-      userPasswordKey: POSTGRES_PASSWORD
-  
-  architecture: standalone
-  
-  primary:
-    persistence:
-      enabled: true
-      size: 8Gi
-    
-    resources:
-      requests:
-        memory: "256Mi"
-        cpu: "100m"
-      limits:
-        memory: "1Gi"
-        cpu: "500m"
+  # PostgreSQL subchart configuration
+  postgresql:
+    enabled: true
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/postgresql
+      tag: "15.4.0"
+
+    auth:
+      username: bn_backstage
+      database: backstage
+      existingSecret: backstage-secrets
+      secretKeys:
+        adminPasswordKey: POSTGRES_PASSWORD
+        userPasswordKey: POSTGRES_PASSWORD
+
+    architecture: standalone
+
+    primary:
+      persistence:
+        enabled: true
+        size: 8Gi
+
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
