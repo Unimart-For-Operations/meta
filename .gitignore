@@ -31,6 +31,7 @@ credentials.json
 .env
 .env.*
 !.env.example
+packages/backstage/templates/secret.yaml
 repositories/backstage-platform/
 repositories/backstage-templates/
 

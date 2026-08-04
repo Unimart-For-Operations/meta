@@ -83,6 +83,16 @@ backstage:
         title: IDP Platform
         baseUrl: http://backstage.cnoe.localtest.me
 
+        # Enable feature discovery so installed frontend plugins
+        # (notifications, scaffolder, search, etc.) are registered.
+        packages: all
+
+        extensions:
+          # Mount the catalog index page at the root.
+          - page:catalog:
+              config:
+                path: /
+
       organization:
         name: Unimart-For-Operations
 
