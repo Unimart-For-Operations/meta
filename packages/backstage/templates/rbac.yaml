@@ -72,6 +72,12 @@ rules:
       - pods
       - nodes
     verbs: ["get", "list"]
+
+  # Non-resource URLs (Kubernetes API server /version endpoint)
+  - nonResourceURLs:
+      - /version
+      - /version/*
+    verbs: ["get"]
 ---
 # ClusterRoleBinding for Backstage ServiceAccount
 apiVersion: rbac.authorization.k8s.io/v1

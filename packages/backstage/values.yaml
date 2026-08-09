@@ -237,6 +237,36 @@ backstage:
                 username: admin
                 password: ${ARGOCD_ADMIN_PASSWORD}
 
+      # Tech Insights - scorecards and fact checks
+      techInsights:
+        factRetrievers:
+          k8sClusterVersionFactRetriever:
+            cadence: '0 */6 * * *'
+            initialDelay:
+              seconds: 30
+            lifecycle:
+              timeToLive:
+                weeks: 4
+        factChecker:
+          checks:
+            k8sVersionSupported:
+              type: json-rules-engine
+              name: Kubernetes version supported
+              description: Ensures the cluster runs a supported Kubernetes version (>= v1.33)
+              factIds:
+                - k8sClusterVersionFactRetriever
+              rule:
+                conditions:
+                  all:
+                    - fact: majorMinorNumeric
+                      operator: greaterThanInclusive
+                      value: 133
+              successMetadata:
+                message: The cluster runs a supported Kubernetes version.
+              failureMetadata:
+                message: The cluster runs an unsupported Kubernetes version. Upgrade the cluster.
+
+
   # ServiceAccount with Kubernetes RBAC
   serviceAccount:
     create: false  # Created via templates/rbac.yaml
