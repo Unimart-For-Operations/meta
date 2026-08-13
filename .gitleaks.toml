@@ -1,0 +1,11 @@
+title = "gitleaks config for meta"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives"
+
+regexes = [
+  '''x-access-token:\$\{\{ secrets\.GITHUB_TOKEN \}\}''',
+]

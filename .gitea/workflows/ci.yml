@@ -1,38 +1,197 @@
+# CI for the Unimart-For-Operations meta repo.
+#
+# Gitea-native workflow: uses only shell steps (no third-party actions), so it
+# runs on any act_runner. Jobs are isolated in containers declared per job.
+#
+# Pipeline stages:
+#   1. go-checks       — fast static gate (gofmt / vet / build / test)
+#   2. security        — full-repo secret scan (gitleaks)
+#   3. contracts       — org cross-repo contract validation (stockroom check)
+#   4. commit-gates    — PR-only: conventional commits + DCO sign-off
+#   5. container-smoke — end-to-end `make test` in the Ubuntu test container
+#
+# NOTE: the container-smoke job nests podman inside a privileged job container.
+# The act_runner must run with `container.privileged: true` in its config.yaml.
+
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  go-checks:
+    name: Go checks (fmt / vet / build / test)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: golang:1.25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: false  # submodules aren't needed for build/test
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
-      - name: Go fmt check
         run: |
-          out=$(gofmt -l .)
-          if [ -n "$out" ]; then
-            echo "Files not formatted:"
-            echo "$out"
+          host="${GITHUB_SERVER_URL#https://}"
+          host="${host#http://}"
+          host="${host%/}"
+          git clone --depth 1 "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+
+      # `go fmt ./...` only touches packages of this module (nested modules such
+      # as idpbuilder/ or the scaffolder templates are skipped), then `git diff`
+      # turns any reformatting into a violation.
+      - name: gofmt check
+        run: |
+          go fmt ./...
+          if ! git diff --exit-code --quiet; then
+            echo "::error::Go files are not formatted — run: go fmt ./..."
+            git --no-pager diff --stat
             exit 1
           fi
 
-      - name: Go vet
+      - name: go vet
         run: go vet ./...
 
-      - name: Go build
+      - name: go build
         run: go build ./...
 
-      - name: Go test
+      - name: go test
         run: go test ./...
+
+  security:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: alpine:3.20
+    steps:
+      - name: Checkout
+        run: |
+          apk add --no-cache git curl ca-certificates
+          host="${GITHUB_SERVER_URL#https://}"
+          host="${host#http://}"
+          host="${host%/}"
+          git clone --depth 1 "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+
+      - name: Install gitleaks
+        run: |
+          arch="$(uname -m)"
+          [ "${arch}" = "x86_64" ] && arch="amd64"
+          [ "${arch}" = "aarch64" ] && arch="arm64"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_Linux_${arch}.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: gitleaks detect
+        run: gitleaks detect --source . --no-banner --exit-code 1 --verbose
+
+  contracts:
+    name: Org contracts (stockroom check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: golang:1.25
+    steps:
+      - name: Checkout (with submodules)
+        run: |
+          host="${GITHUB_SERVER_URL#https://}"
+          host="${host#http://}"
+          host="${host%/}"
+          git clone --depth 1 --recurse-submodules --jobs 4 \
+            "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+
+      - name: Build unimart
+        run: go build -o /tmp/unimart .
+
+      - name: stockroom check
+        run: /tmp/unimart stockroom check
+
+  commit-gates:
+    name: Commit gates (conventional + DCO)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: alpine:3.20
+    steps:
+      - name: Checkout (full history)
+        run: |
+          apk add --no-cache git ca-certificates
+          host="${GITHUB_SERVER_URL#https://}"
+          host="${host#http://}"
+          host="${host%/}"
+          git clone --filter=blob:none "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+
+      - name: Validate conventional commits + DCO
+        run: |
+          set -eu
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          git fetch origin "${head}"
+          git fetch origin "${base}" --depth 1
+
+          fails=0
+          for c in $(git rev-list --no-merges "${base}..${head}"); do
+            subject="$(git show -s --format=%s "${c}")"
+            body="$(git show -s --format=%B "${c}")"
+
+            case "${subject}" in
+              Revert*) continue ;;
+            esac
+
+            if ! printf '%s' "${subject}" | grep -qiE \
+                '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|wip)(\([a-zA-Z0-9._-]+\))?!?:[[:space:]]+.*'; then
+              short="$(git rev-parse --short "${c}")"
+              echo "::error::${short} not a conventional commit: ${subject}"
+              echo "  expected e.g.: feat(cmd): add stockroom drift command"
+              fails=1
+            fi
+
+            if ! printf '%s\n' "${body}" | grep -q '^Signed-off-by: '; then
+              short="$(git rev-parse --short "${c}")"
+              echo "::error::${short} missing DCO sign-off: ${subject}"
+              echo "  add: git commit -s --amend"
+              fails=1
+            fi
+          done
+
+          if [ "${fails}" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All commits conventional with DCO sign-off"
+
+  container-smoke:
+    name: Container smoke test (make test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: docker.io/library/ubuntu:24.04
+      options: --privileged
+    steps:
+      - name: Checkout (with submodules)
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+          host="${GITHUB_SERVER_URL#https://}"
+          host="${host#http://}"
+          host="${host%/}"
+          git clone --depth 1 --recurse-submodules --jobs 4 \
+            "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+
+      - name: Install podman
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends podman podman-compose make curl
+          # vfs storage avoids overlay-in-overlay inside the privileged job container
+          mkdir -p /etc/containers
+          printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf
+          podman --version
+          podman-compose --version
+
+      - name: make test
+        run: make test
