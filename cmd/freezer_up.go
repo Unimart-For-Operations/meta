@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	upSkipBuild             bool
 	upCPU                   int
 	upMemory                int
 	upDisk                  int
@@ -23,6 +22,7 @@ var (
 	upPublishNonInteractive bool
 	upPublishUseSSH         bool
 	upPublishSSHKeyPath     string
+	upCreateOpts            createOptions
 )
 
 var freezerUpCmd = &cobra.Command{
@@ -31,8 +31,8 @@ var freezerUpCmd = &cobra.Command{
 	Long: `Performs the full startup sequence:
   1. Verify prerequisites (run doctor)
   2. Ensure Docker daemon is reachable (start Colima on macOS)
-  3. Build idpbuilder from source (unless --skip-build)
-  4. Run ./idpbuilder create
+  3. Generate developer configs (tmux, k9s themes)
+  4. Run idpbuilder create (in-process)
 
 Extra arguments after -- are passed to idpbuilder create.`,
 	RunE: runFreezerUp,
@@ -40,7 +40,6 @@ Extra arguments after -- are passed to idpbuilder create.`,
 
 func init() {
 	defaults := colima.DefaultConfig()
-	freezerUpCmd.Flags().BoolVar(&upSkipBuild, "skip-build", false, "Skip the build step (use existing binary)")
 	freezerUpCmd.Flags().IntVar(&upCPU, "cpu", defaults.CPU, "Colima VM CPU count (macOS only)")
 	freezerUpCmd.Flags().IntVar(&upMemory, "memory", defaults.Memory, "Colima VM memory in GB (macOS only)")
 	freezerUpCmd.Flags().IntVar(&upDisk, "disk", defaults.Disk, "Colima VM disk in GB (macOS only)")
@@ -52,6 +51,7 @@ func init() {
 	freezerUpCmd.Flags().BoolVar(&upPublishNonInteractive, "publish-non-interactive", false, "Run without prompts (requires token and defaults)")
 	freezerUpCmd.Flags().BoolVar(&upPublishUseSSH, "publish-use-ssh", false, "Use SSH remotes during publish step (non-interactive)")
 	freezerUpCmd.Flags().StringVar(&upPublishSSHKeyPath, "publish-ssh-key-path", "", "Path to public SSH key to upload during publish (non-interactive)")
+	addCreateFlags(freezerUpCmd, &upCreateOpts)
 	freezerCmd.AddCommand(freezerUpCmd)
 }
 
@@ -60,7 +60,6 @@ func runFreezerUp(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	idpDir := filepath.Join(orgDir, "idpbuilder")
 
 	// Step 1: Check prerequisites
 	fmt.Printf("%s Checking prerequisites\n\n", bold("[1/4]"))
@@ -74,11 +73,6 @@ func runFreezerUp(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Step 3: Build
-	if err := buildIdpbuilder(idpDir, "[3/4]", upSkipBuild); err != nil {
-		return err
-	}
-
 	// Generate developer configs (tmux, k9s) into the org workspace
 	genOut := filepath.Join(orgDir, ".workspace", "generated")
 	if err := os.MkdirAll(genOut, 0755); err != nil {
@@ -87,10 +81,13 @@ func runFreezerUp(cmd *cobra.Command, args []string) error {
 		fmt.Printf("warning: failed to generate dev theme files: %v\n", err)
 	}
 
-	// Step 4: Create IDP
-	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[4/4]"))
+	// Step 3: Create IDP
+	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[3/4]"))
 
-	if err := createIDP(idpDir, args); err != nil {
+	packagesDir := filepath.Join(orgDir, "packages")
+	createArgs := idpCreateArgs(packagesDir, upCreateOpts, args)
+
+	if err := createIDP(cmd.Context(), createArgs); err != nil {
 		return err
 	}
 

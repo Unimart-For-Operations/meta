@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/Unimart-For-Operations/meta/internal/builder"
 	"github.com/Unimart-For-Operations/meta/internal/cluster"
 	"github.com/Unimart-For-Operations/meta/internal/gitea"
 	"github.com/spf13/cobra"
@@ -13,6 +12,7 @@ import (
 var (
 	reloadSkipCreate  bool
 	reloadSkipPublish bool
+	reloadCreateOpts  createOptions
 )
 
 var reloadCmd = &cobra.Command{
@@ -37,6 +37,7 @@ Extra arguments after -- are passed through to idpbuilder create.`,
 func init() {
 	reloadCmd.Flags().BoolVar(&reloadSkipCreate, "skip-create", false, "Skip the idpbuilder create reconcile step")
 	reloadCmd.Flags().BoolVar(&reloadSkipPublish, "skip-publish", false, "Skip publishing repos to Gitea")
+	addCreateFlags(reloadCmd, &reloadCreateOpts)
 	rootCmd.AddCommand(reloadCmd)
 }
 
@@ -45,7 +46,6 @@ func runReload(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	idpDir := filepath.Join(orgDir, "idpbuilder")
 
 	// Step 1: Re-run idpbuilder create (idempotent reconcile)
 	if reloadSkipCreate {
@@ -54,9 +54,9 @@ func runReload(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%s Reconciling IDP platform\n\n", bold("[1/2]"))
 
 		packagesDir := filepath.Join(orgDir, "packages")
-		createArgs := idpCreateArgs(packagesDir, args)
+		createArgs := idpCreateArgs(packagesDir, reloadCreateOpts, args)
 
-		if err := builder.Create(idpDir, createArgs); err != nil {
+		if err := createIDP(cmd.Context(), createArgs); err != nil {
 			return err
 		}
 		fmt.Printf("  %s platform reconciled\n", pass("[ok]"))

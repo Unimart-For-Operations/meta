@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -89,6 +92,12 @@ func helpTemplate() string {
 
 // Execute runs the root command. This is the only exported function.
 func Execute() error {
+	// Wire OS signals into the command context so Ctrl-C cancels the
+	// in-process idpbuilder create/delete engines cleanly.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	rootCmd.SetContext(ctx)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s %s\n", fail("[fail]"), err)
 		return err

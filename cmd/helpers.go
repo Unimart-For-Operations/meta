@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,9 @@ import (
 	"github.com/Unimart-For-Operations/meta/internal/builder"
 	"github.com/Unimart-For-Operations/meta/internal/cluster"
 	"github.com/Unimart-For-Operations/meta/internal/colima"
+	"github.com/Unimart-For-Operations/meta/internal/idp"
 	"github.com/Unimart-For-Operations/meta/internal/prereqs"
+	"github.com/spf13/cobra"
 )
 
 // checkPlatformPrereqs runs prerequisite checks and returns an error if
@@ -85,24 +88,29 @@ func ensureDocker(stepLabel string, cfg *colima.Config) error {
 	return nil
 }
 
-// buildIdpbuilder builds idpbuilder from source. If skipBuild is true,
-// the build is skipped. The stepLabel is printed before the action.
-func buildIdpbuilder(idpDir, stepLabel string, skipBuild bool) error {
-	fmt.Printf("\n%s Building idpbuilder\n\n", bold(stepLabel))
-
-	if _, err := os.Stat(idpDir); err != nil {
-		return fmt.Errorf("idpbuilder directory not found at %s", idpDir)
+// initIDP sets up the in-process idpbuilder logger before create/delete.
+func initIDP() error {
+	level := "info"
+	if verbose {
+		level = "debug"
 	}
-
-	if skipBuild {
-		fmt.Println("  Skipping build (--skip-build)")
-		return nil
-	}
-	return builder.Build(idpDir, verbose)
+	return idp.SetLogger(level, true)
 }
 
-func createIDP(idpDir string, args []string) error {
-	return builder.Create(idpDir, args)
+// createIDP runs idpbuilder's create engine in-process with the given args.
+func createIDP(ctx context.Context, args []string) error {
+	if err := initIDP(); err != nil {
+		return err
+	}
+	return idp.Run(ctx, args)
+}
+
+// deleteIDP tears down the IDP cluster in-process.
+func deleteIDP(ctx context.Context, name string) error {
+	if err := initIDP(); err != nil {
+		return err
+	}
+	return idp.Delete(ctx, name)
 }
 
 // devPasswordFlag returns "--dev-password" when the existing cluster was
@@ -116,13 +124,69 @@ func devPasswordFlag(determined, enabled bool) string {
 	return ""
 }
 
+// createOptions carries the curated idpbuilder create settings exposed by
+// open, reload, and freezer up. Values map 1:1 onto idpbuilder create flags.
+type createOptions struct {
+	name           string
+	kubeVersion    string
+	extraPorts     string
+	registryConfig []string
+	usePathRouting bool
+	packageCustom  []string
+	kindConfig     string
+	ingressHost    string
+	recreate       bool
+}
+
+// addCreateFlags registers the curated idpbuilder create flags onto cmd.
+func addCreateFlags(cmd *cobra.Command, o *createOptions) {
+	cmd.Flags().StringVar(&o.name, "name", "localdev", "Name for the build (prefix for Kind cluster name, pods, etc)")
+	cmd.Flags().StringVar(&o.kubeVersion, "kube-version", "v1.33.1", "Version of the Kind Kubernetes cluster to create")
+	cmd.Flags().StringVar(&o.extraPorts, "extra-ports", "", `List of extra ports to expose (e.g. "22:32222,9090:39090")`)
+	cmd.Flags().StringSliceVar(&o.registryConfig, "registry-config", nil, "Paths to registry config, first one that exists is used")
+	cmd.Flags().BoolVar(&o.usePathRouting, "use-path-routing", false, "Expose web UIs under a single domain name")
+	cmd.Flags().StringSliceVar(&o.packageCustom, "package-custom-file", nil, "Customize core packages (argocd, nginx, gitea) e.g. argocd:/tmp/argocd.yaml")
+	cmd.Flags().StringVar(&o.kindConfig, "kind-config", "", "Path or URL to a kind config file")
+	cmd.Flags().StringVar(&o.ingressHost, "ingress-host-name", "", "Host name used by ingresses")
+	cmd.Flags().BoolVar(&o.recreate, "recreate", false, "Delete the cluster first if it already exists")
+}
+
 // idpCreateArgs builds the idpbuilder create argument list for open/reload.
 // It always matches the existing cluster's dev-password setting so a
 // reconcile (reload) succeeds without a teardown, while keeping
 // --dev-password as the default for fresh clusters.
-func idpCreateArgs(packagesDir string, extraArgs []string) []string {
+func idpCreateArgs(packagesDir string, o createOptions, extraArgs []string) []string {
+	var args []string
+	if o.name != "" {
+		args = append(args, "--name="+o.name)
+	}
+	if o.kubeVersion != "" {
+		args = append(args, "--kube-version="+o.kubeVersion)
+	}
+	if o.extraPorts != "" {
+		args = append(args, "--extra-ports="+o.extraPorts)
+	}
+	for _, rc := range o.registryConfig {
+		args = append(args, "--registry-config="+rc)
+	}
+	if o.usePathRouting {
+		args = append(args, "--use-path-routing")
+	}
+	for _, pc := range o.packageCustom {
+		args = append(args, "--package-custom-file="+pc)
+	}
+	if o.kindConfig != "" {
+		args = append(args, "--kind-config="+o.kindConfig)
+	}
+	if o.ingressHost != "" {
+		args = append(args, "--ingress-host-name="+o.ingressHost)
+	}
+	if o.recreate {
+		args = append(args, "--recreate")
+	}
+	args = append(args, "--no-exit=false")
+
 	enabled, determined := cluster.StaticPasswordEnabled()
-	args := []string{"--no-exit=false"}
 	if flag := devPasswordFlag(determined, enabled); flag != "" {
 		args = append([]string{flag}, args...)
 	}
@@ -138,13 +202,8 @@ func dockerEndpointIsPodman() bool {
 
 // buildCustomImages builds custom container images (backstage-platform).
 // It skips gracefully if the source directory doesn't exist.
-func buildCustomImages(stepLabel, orgDir string, skipBuild bool) error {
+func buildCustomImages(stepLabel, orgDir string) error {
 	fmt.Printf("\n%s Building custom container images\n\n", bold(stepLabel))
-
-	if skipBuild {
-		fmt.Println("  Skipping build (--skip-build)")
-		return nil
-	}
 
 	// Check if backstage-platform exists
 	backstageDir := filepath.Join(orgDir, "repositories", "backstage-platform")

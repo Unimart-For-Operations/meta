@@ -9,14 +9,14 @@ The `unimart` binary is a Go CLI built from this repo. It is the primary interfa
 | Aisle | Domain | Key Commands |
 |-------|--------|--------------|
 | `deli` | Workstation config (Nix/HM) | `switch`, `doctor`, `bootstrap`, `hosts` |
-| `freezer` | IDP platform lifecycle | `up`, `down`, `status`, `build`, `doctor`, `repos`, `repos-publish-to-gitea`, `docs` |
+| `freezer` | IDP platform lifecycle | `up`, `down`, `status`, `doctor`, `repos`, `repos-publish-to-gitea`, `docs` |
 | `stockroom` | Cross-repo coordination | `check` |
 
 Top-level commands (not under any aisle):
 
 | Command | Purpose |
 |---------|---------|
-| `open` | Bring the full IDP platform online (prereqs, build, create, publish, browser) |
+| `open` | Bring the full IDP platform online (prereqs, create, publish, browser) |
 | `close` | Tear down the IDP platform (symmetric inverse of `open`) |
 | `reload` | Reconcile platform changes without teardown (re-run create + re-publish repos) |
 | `version` | Print version information |
@@ -27,7 +27,8 @@ Source layout:
 - `internal/host/` — host auto-detection (scans cmdr meta.nix files)
 - `internal/platform/` — platform detection, command execution utilities
 - `internal/submodule/` — dynamic submodule discovery (parses `.gitmodules` at runtime)
-- `internal/builder/` — idpbuilder build and create orchestration
+- `internal/idp/` — in-process idpbuilder wiring (reuses its create/delete cobra commands)
+- `internal/builder/` — container image build/load helpers (backstage-platform, Kind image loading)
 - `internal/cluster/` — Kind cluster inspection (ArgoCD apps, secrets, Gitea token)
 - `internal/colima/` — Colima VM lifecycle (start, stop, status, socket path)
 - `internal/container/` — container image loading (Kind + Podman)
@@ -36,13 +37,21 @@ Source layout:
 - `internal/repos/` — org repo discovery and Gitea publish
 - `internal/theme/` — theme loading, k9s skin and tmux status generation
 
+idpbuilder is absorbed into this repo as a tracked directory (`idpbuilder/`, a
+nested Go module `github.com/cnoe-io/idpbuilder`) and compiled directly into the
+unimart binary via `replace github.com/cnoe-io/idpbuilder => ./idpbuilder` in
+`go.mod`. There is no separate idpbuilder binary build step; `open`/`reload`/
+`freezer up` run idpbuilder's create engine in-process (`internal/idp`), and
+`close`/`freezer down` run its delete engine. Custom create flags map 1:1 to
+idpbuilder flags via the curated flags on those commands, plus a `--` passthrough.
+
 ## Repositories
 
 | Repo | Purpose | Language | Status |
 |------|---------|----------|--------|
 | [cmdr](cmdr/) | Nix flake + Home Manager workstation config | Nix | Active |
 | [docs-service](docs-service/) | Phoenix microservice serving org docs from Gitea (deployed via `unimart freezer docs up`, not `unimart open`) | Elixir | Active |
-| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder (private fork of cnoe-io/idpbuilder) | Go | Active |
+| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder, absorbed in-tree as a nested Go module (fork of cnoe-io/idpbuilder) | Go | Active |
 
 ## Distribution
 
@@ -123,7 +132,7 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 ├── cmd/                                 Cobra command tree
 │   ├── root.go                          Root command, color helpers, org-dir resolution
 │   ├── version.go                       Version command with ldflags injection
-│   ├── open.go                          Top-level: open for business (6-step IDP startup)
+│   ├── open.go                          Top-level: open for business (7-step IDP startup)
 │   ├── close.go                         Top-level: close up shop (symmetric inverse of open)
 │   ├── reload.go                        Top-level: reconcile changes without teardown
 │   ├── helpers.go                       Shared prereq/docker/build helpers
@@ -136,7 +145,6 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 │   ├── freezer_up.go                    freezer up (4-step platform startup)
 │   ├── freezer_down.go                  freezer down (cluster teardown)
 │   ├── freezer_status.go               freezer status (cluster + ArgoCD + secrets)
-│   ├── freezer_build.go                freezer build (idpbuilder make build)
 │   ├── freezer_doctor.go               freezer doctor (prerequisite checks)
 │   ├── freezer_bootstrap.go            freezer bootstrap (install prerequisites)
 │   ├── freezer_repos.go                 freezer repos (list/clone/status)
@@ -149,7 +157,8 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 │   ├── platform/detect.go              Platform detection, command execution
 │   ├── platform/browser.go             Platform-aware OpenBrowser(url)
 │   ├── submodule/submodule.go          Dynamic submodule discovery (.gitmodules parser)
-│   ├── builder/builder.go              Build(), Create(), Delete(), KindDeleteCluster()
+│   ├── idp/idp.go                      In-process idpbuilder wiring (SetLogger, Run, Delete)
+│   ├── builder/builder.go              BuildBackstagePlatform(), KindDeleteCluster(), LoadImageIntoKind()
 │   ├── cluster/cluster.go              IsClusterRunning(), GetArgoApps(), GetSecrets(), GetGiteaAdminToken()
 │   ├── colima/colima.go                Start(), Stop(), IsRunning(), EnsureDockerHost(), SocketPath()
 │   ├── container/runtime.go            LoadImageIntoKind(), GatherImagesFromIdpbuilder()
@@ -173,8 +182,10 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 ├── repositories/                        Publish-to-Gitea symlink directory
 ├── cmdr/                                Nix workstation config (submodule)
 ├── docs-service/                        Phoenix docs microservice (submodule pending; see repositories/)
-└── idpbuilder/                          IDP builder (submodule)
+└── idpbuilder/                          IDP builder (tracked directory, nested Go module)
 ```
+
+> **Note**: `idpbuilder` is no longer a submodule — it was absorbed into this repo as a tracked directory (see above). `docs-service` is pending submodule registration. Only `cmdr` remains an active submodule in `.gitmodules`.
 
 ## Working in This Directory
 

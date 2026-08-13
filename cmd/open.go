@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Unimart-For-Operations/meta/internal/builder"
 	"github.com/Unimart-For-Operations/meta/internal/cluster"
 	"github.com/Unimart-For-Operations/meta/internal/gitea"
 	"github.com/Unimart-For-Operations/meta/internal/platform"
@@ -21,10 +20,8 @@ const (
 )
 
 var (
-	openSkipBuild     bool
-	openNoBrowser     bool
-	openRecreate      bool
-	openRebuildImages bool
+	openNoBrowser  bool
+	openCreateOpts createOptions
 )
 
 var openCmd = &cobra.Command{
@@ -35,11 +32,11 @@ var openCmd = &cobra.Command{
 Performs a 7-step startup sequence:
   1. Check prerequisites (Go, Docker, Kind, kubectl)
   2. Start container runtime (Colima on macOS)
-  3. Build idpbuilder from source (unless --skip-build)
-  4. Build custom images (backstage-platform, unless --skip-build)
-  5. Create IDP platform (ArgoCD + Gitea + nginx on Kind)
-  6. Load custom images into Kind
-  7. Publish all org repos to in-cluster Gitea + open browser
+  3. Build custom images (backstage-platform)
+  4. Create IDP platform (ArgoCD + Gitea + nginx on Kind, in-process)
+  5. Load custom images into Kind
+  6. Publish all org repos to in-cluster Gitea
+  7. Open browser
 
 Opinionated defaults: dev password enabled, exit-after-sync mode,
 all org repos published to Gitea via HTTPS.
@@ -49,10 +46,8 @@ Extra arguments after -- are passed through to idpbuilder create.`,
 }
 
 func init() {
-	openCmd.Flags().BoolVar(&openSkipBuild, "skip-build", false, "Skip the idpbuilder and custom image build steps")
 	openCmd.Flags().BoolVar(&openNoBrowser, "no-browser", false, "Don't auto-open the ArgoCD dashboard")
-	openCmd.Flags().BoolVar(&openRecreate, "recreate", false, "Tear down existing cluster first, then recreate")
-	openCmd.Flags().BoolVar(&openRebuildImages, "rebuild-images", false, "Force rebuild of custom images even if they exist")
+	addCreateFlags(openCmd, &openCreateOpts)
 	rootCmd.AddCommand(openCmd)
 }
 
@@ -60,19 +55,6 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	orgDir, err := resolveOrgDir()
 	if err != nil {
 		return err
-	}
-	idpDir := filepath.Join(orgDir, "idpbuilder")
-
-	// --recreate: tear down first
-	if openRecreate {
-		fmt.Printf("%s Tearing down existing cluster\n\n", bold("[0/7]"))
-		if err := builder.Delete(idpDir); err != nil {
-			// Non-fatal: cluster may not exist yet
-			fmt.Printf("  %s teardown: %v (continuing)\n", warn("[warn]"), err)
-		} else {
-			fmt.Printf("  %s cluster removed\n", pass("[ok]"))
-		}
-		fmt.Println()
 	}
 
 	// Step 1: Check prerequisites
@@ -86,36 +68,30 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Step 3: Build idpbuilder
-	if err := buildIdpbuilder(idpDir, "[3/7]", openSkipBuild); err != nil {
+	// Step 3: Build custom images
+	if err := buildCustomImages("[3/7]", orgDir); err != nil {
 		return err
 	}
 
-	// Step 4: Build custom images
-	skipImageBuild := openSkipBuild && !openRebuildImages
-	if err := buildCustomImages("[4/7]", orgDir, skipImageBuild); err != nil {
-		return err
-	}
-
-	// Step 5: Create IDP platform with opinionated defaults
-	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[5/7]"))
+	// Step 4: Create IDP platform with opinionated defaults
+	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[4/7]"))
 
 	// Resolve packages dir (may not exist yet — that's fine, idpbuilder handles it)
 	packagesDir := filepath.Join(orgDir, "packages")
-	createArgs := idpCreateArgs(packagesDir, args)
+	createArgs := idpCreateArgs(packagesDir, openCreateOpts, args)
 
-	if err := createIDP(idpDir, createArgs); err != nil {
+	if err := createIDP(cmd.Context(), createArgs); err != nil {
 		return err
 	}
 	fmt.Printf("  %s IDP platform running\n", pass("[ok]"))
 
-	// Step 6: Load custom images into Kind
-	if err := loadCustomImages("[6/7]"); err != nil {
+	// Step 5: Load custom images into Kind
+	if err := loadCustomImages("[5/7]"); err != nil {
 		return err
 	}
 
-	// Step 7: Publish all org repos to in-cluster Gitea
-	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[7/7]"))
+	// Step 6: Publish all org repos to in-cluster Gitea
+	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[6/7]"))
 
 	token, err := cluster.GetGiteaAdminToken(defaultGiteaURL)
 	if err != nil {

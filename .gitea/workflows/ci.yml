@@ -42,19 +42,23 @@ jobs:
           git clone --depth 1 "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
 
       # `go fmt ./...` only touches packages of this module (nested modules such
-      # as idpbuilder/ or the scaffolder templates are skipped), then `git diff`
-      # turns any reformatting into a violation.
+      # as idpbuilder/ or the scaffolder templates are skipped), so we format
+      # the nested idpbuilder module explicitly, then `git diff` turns any
+      # reformatting into a violation.
       - name: gofmt check
         run: |
           go fmt ./...
+          go -C idpbuilder fmt ./...
           if ! git diff --exit-code --quiet; then
-            echo "::error::Go files are not formatted — run: go fmt ./..."
+            echo "::error::Go files are not formatted — run: go fmt ./... && go -C idpbuilder fmt ./..."
             git --no-pager diff --stat
             exit 1
           fi
 
       - name: go vet
-        run: go vet ./...
+        run: |
+          go vet ./...
+          go -C idpbuilder vet ./...
 
       - name: go build
         run: go build ./...

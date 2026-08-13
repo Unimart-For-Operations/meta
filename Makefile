@@ -86,12 +86,14 @@ install: build ## Build and symlink to ~/.local/bin/unimart
 dev: ## Run unimart from source (pass ARGS="...")
 	@go run -ldflags "$(LDFLAGS)" . $(ARGS)
 
-fmt: ## Format Go source
+fmt: ## Format Go source (meta + nested idpbuilder module)
 	@go fmt ./...
+	@go -C idpbuilder fmt ./...
 	@printf "  $(PASS) formatted\n"
 
-vet: ## Run go vet
+vet: ## Run go vet (meta + nested idpbuilder module)
 	@go vet ./...
+	@go -C idpbuilder vet ./...
 	@printf "  $(PASS) vet passed\n"
 
 completion: ## Generate shell completion (COMPLETION_SHELL=zsh|bash|fish)

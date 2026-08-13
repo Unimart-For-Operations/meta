@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
-	"github.com/Unimart-For-Operations/meta/internal/builder"
 	"github.com/Unimart-For-Operations/meta/internal/colima"
 	"github.com/Unimart-For-Operations/meta/internal/prereqs"
 	"github.com/spf13/cobra"
@@ -13,6 +11,7 @@ import (
 var (
 	closeStopColima bool
 	closeYes        bool
+	closeName       string
 )
 
 var closeCmd = &cobra.Command{
@@ -33,16 +32,11 @@ func init() {
 		closeCmd.Flags().BoolVar(&closeStopColima, "stop-colima", false, "Also stop the Colima VM (macOS only)")
 	}
 	closeCmd.Flags().BoolVarP(&closeYes, "yes", "y", false, "Skip confirmation prompt")
+	closeCmd.Flags().StringVar(&closeName, "name", "localdev", "Name of the Kind cluster to delete")
 	rootCmd.AddCommand(closeCmd)
 }
 
 func runClose(cmd *cobra.Command, args []string) error {
-	orgDir, err := resolveOrgDir()
-	if err != nil {
-		return err
-	}
-	idpDir := filepath.Join(orgDir, "idpbuilder")
-
 	if !closeYes {
 		if !promptYesNo("This will delete the IDP cluster. Continue? [Y/n] ", true) {
 			fmt.Println("Cancelled")
@@ -59,7 +53,7 @@ func runClose(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Printf("%s Deleting IDP platform\n\n", bold("[1/2]"))
-		if err := builder.Delete(idpDir); err != nil {
+		if err := deleteIDP(cmd.Context(), closeName); err != nil {
 			return err
 		}
 
@@ -73,7 +67,7 @@ func runClose(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		fmt.Printf("%s Deleting IDP platform\n\n", bold("[1/1]"))
-		if err := builder.Delete(idpDir); err != nil {
+		if err := deleteIDP(cmd.Context(), closeName); err != nil {
 			return err
 		}
 	}

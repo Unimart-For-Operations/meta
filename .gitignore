@@ -8,6 +8,7 @@ result-*
 # Go build artifacts
 unimart
 dist/
+vendor/
 
 # macOS
 .DS_Store

@@ -1,49 +1,38 @@
 package builder
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestBuild_MissingMakefile(t *testing.T) {
-	err := Build(t.TempDir(), false)
+func TestBuildBackstagePlatform_MissingSource(t *testing.T) {
+	err := BuildBackstagePlatform(t.TempDir(), false)
 	if err == nil {
-		t.Fatal("Build should fail when Makefile is missing")
+		t.Fatal("BuildBackstagePlatform should fail when source dir is missing")
 	}
-	if !strings.Contains(err.Error(), "Makefile not found") {
+	if !strings.Contains(err.Error(), "backstage-platform source not found") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-func TestBuild_BuildSucceedsButBinaryMissing(t *testing.T) {
-	if _, err := exec.LookPath("make"); err != nil {
-		t.Skip("make not available")
+func TestLoadImageIntoKind_NoClusters(t *testing.T) {
+	if _, err := exec.LookPath("kind"); err != nil {
+		t.Skip("kind not available")
+	}
+	out, err := exec.Command("kind", "get", "clusters").Output()
+	if err != nil {
+		t.Skipf("could not query kind clusters: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "" {
+		t.Skip("kind clusters exist; skipping no-cluster assertion")
 	}
 
-	dir := t.TempDir()
-	makefile := filepath.Join(dir, "Makefile")
-	if err := os.WriteFile(makefile, []byte("build:\n\t@echo fake build\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	err := Build(dir, false)
+	err = LoadImageIntoKind("some-image:latest", false)
 	if err == nil {
-		t.Skip("make build produced a binary; nothing to assert")
+		t.Fatal("LoadImageIntoKind should fail with no kind clusters")
 	}
-	if !strings.Contains(err.Error(), "binary not found") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestCreate_MissingBinary(t *testing.T) {
-	err := Create(t.TempDir(), []string{"--dev-password"})
-	if err == nil {
-		t.Fatal("Create should fail when the idpbuilder binary is missing")
-	}
-	if !strings.Contains(err.Error(), "idpbuilder binary not found") {
+	if !strings.Contains(err.Error(), "no Kind clusters found") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
