@@ -2,7 +2,3 @@
 	path = cmdr
 	url = git@github.com:Unimart-For-Operations/cmdr.git
 	branch = main
-[submodule "idpbuilder"]
-	path = idpbuilder
-	url = git@github.com:Unimart-For-Operations/idpbuilder.git
-	branch = main

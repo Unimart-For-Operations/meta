@@ -1,0 +1,55 @@
+valkey-cluster:
+  enabled: false
+postgresql:
+  enabled: false
+postgresql-ha:
+  enabled: false
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+test:
+  enabled: false
+
+gitea:
+  admin:
+    existingSecret: gitea-credential
+  config:
+    database:
+      DB_TYPE: sqlite3
+    session:
+      PROVIDER: memory
+    cache:
+      ADAPTER: memory
+    queue:
+      TYPE: level
+    server:
+      DOMAIN: '{{- if .UsePathRouting -}} {{ .Host }} {{- else -}} gitea.{{- .Host }} {{- end }}'
+      ROOT_URL: '{{- if .UsePathRouting }} {{- .Protocol }}://{{ .Host }}:{{ .Port }}/gitea {{- else }} {{- .Protocol }}://gitea.{{ .Host }}:{{ .Port }} {{- end }}'
+      SSH_PORT: 32222
+      SSH_LISTEN_PORT: 2222
+    webhook:
+      ALLOWED_HOST_LIST: private
+      SKIP_TLS_VERIFY: true
+
+service:
+  http:
+    type: NodePort
+    port: 3000
+    nodePort: 32223
+    externalTrafficPolicy: Local
+  ssh:
+    type: NodePort
+    port: 32222
+    nodePort: 32222
+    externalTrafficPolicy: Local
+
+ingress:
+  # NOTE: The ingress is generated in a later step for path based routing feature See: hack/argo-cd/generate-manifests.sh
+  enabled: false
+
+image:
+  pullPolicy: "IfNotPresent"
+  # Adds -rootless suffix to image name
+  rootless: true

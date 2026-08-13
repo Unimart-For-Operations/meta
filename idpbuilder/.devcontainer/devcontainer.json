@@ -1,0 +1,19 @@
+{
+  "image": "mcr.microsoft.com/vscode/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.26"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "postCreateCommand": ".devcontainer/postCreateCommand.sh",
+  "postStartCommand": ".devcontainer/postStartCommand.sh",
+  "workspaceFolder": "/home/vscode/idpbuilder",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/idpbuilder,type=bind",
+  "hostRequirements": {
+    "cpus": 4
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/vscode/idpbuilder"
+  }
+}
