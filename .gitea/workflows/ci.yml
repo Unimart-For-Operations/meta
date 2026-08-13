@@ -80,10 +80,23 @@ jobs:
       - name: Install gitleaks
         run: |
           arch="$(uname -m)"
-          [ "${arch}" = "x86_64" ] && arch="amd64"
-          [ "${arch}" = "aarch64" ] && arch="arm64"
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_Linux_${arch}.tar.gz" \
-            -o /tmp/gitleaks.tar.gz
+          case "${arch}" in
+            x86_64)  asset_arch="x64" ;;
+            aarch64) asset_arch="arm64" ;;
+            *) echo "unsupported arch: ${arch}"; exit 1 ;;
+          esac
+          # gitleaks assets embed the version (e.g. gitleaks_8.30.1_linux_x64.tar.gz),
+          # so resolve the latest release URL from the GitHub API.
+          url="$(
+            curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+              | grep -o "https://github.com/gitleaks/gitleaks/releases/download/[^\"]*linux_${asset_arch}.tar.gz" \
+              | head -1
+          )"
+          if [ -z "${url}" ]; then
+            echo "could not resolve gitleaks release asset for ${asset_arch}"
+            exit 1
+          fi
+          curl -fsSL "${url}" -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
           gitleaks version
 
@@ -102,6 +115,10 @@ jobs:
           host="${GITHUB_SERVER_URL#https://}"
           host="${host#http://}"
           host="${host%/}"
+          # Submodules in .gitmodules use SSH URLs (git@github.com:...), which
+          # the runner cannot authenticate. Rewrite them to the Gitea mirrors,
+          # authenticated with the read-only CI bot token.
+          git config --global url."http://x-access-token:${{ secrets.CI_SUBMODULE_TOKEN }}@${host}/Unimart-For-Operations/".insteadOf "git@github.com:Unimart-For-Operations/"
           git clone --depth 1 --recurse-submodules --jobs 4 \
             "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
 
@@ -179,6 +196,10 @@ jobs:
           host="${GITHUB_SERVER_URL#https://}"
           host="${host#http://}"
           host="${host%/}"
+          # Submodules in .gitmodules use SSH URLs (git@github.com:...), which
+          # the runner cannot authenticate. Rewrite them to the Gitea mirrors,
+          # authenticated with the read-only CI bot token.
+          git config --global url."http://x-access-token:${{ secrets.CI_SUBMODULE_TOKEN }}@${host}/Unimart-For-Operations/".insteadOf "git@github.com:Unimart-For-Operations/"
           git clone --depth 1 --recurse-submodules --jobs 4 \
             "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
 
