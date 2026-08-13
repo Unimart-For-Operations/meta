@@ -122,47 +122,19 @@ completion: ## Generate shell completion (COMPLETION_SHELL=zsh|bash|fish)
 
 # ── Setup ──────────────────────────────────────────────────────────────────
 
-init: ## Full setup: submodules → prerequisites → register → apply → verify
-	@bash scripts/setup.sh
-
-bootstrap: ## Initialize submodules and install hooks across all repos
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@printf "$(BOLD)idpbuilder — Bootstrap$(RESET)\n"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo ""
-	@printf "$(BOLD)[1/3] Initializing submodules$(RESET)\n"
-	@git submodule update --init --recursive
-	@printf "  $(PASS) Submodules initialized\n"
-	@echo ""
-	@printf "$(BOLD)[2/3] Verifying submodule remotes$(RESET)\n"
-	@ERRORS=0; \
-	for mod in $(SUBMODULES); do \
-		if [ -d "$$mod/.git" ] || [ -f "$$mod/.git" ]; then \
-			REMOTE=$$(git -C "$$mod" remote get-url origin 2>/dev/null); \
-			if echo "$$REMOTE" | grep -q 'github.com[:/]Unimart-For-Operations/'; then \
-				printf "  $(PASS) $$mod → $$REMOTE\n"; \
-			else \
-				printf "  $(FAIL) $$mod → $$REMOTE (expected github.com:Unimart-For-Operations/)\n"; \
-				ERRORS=$$((ERRORS + 1)); \
-			fi; \
-		else \
-			printf "  $(FAIL) $$mod — not a git repo\n"; \
-			ERRORS=$$((ERRORS + 1)); \
-		fi; \
-	done; \
-	if [ $$ERRORS -gt 0 ]; then \
-		printf "\n$(RED)$$ERRORS remote(s) misconfigured. Fix before continuing.$(RESET)\n"; \
-		exit 1; \
+init: ## Compatibility wrapper for the CLI onboarding flow
+	@if command -v unimart >/dev/null 2>&1; then \
+		unimart deli bootstrap; \
+	else \
+		go run . deli bootstrap; \
 	fi
-	@echo ""
-	@printf "$(BOLD)[3/3] Git hooks$(RESET)\n"
-	@printf "  $(INFO) Hooks are Nix-managed via cmdr git module (ADR-005)\n"
-	@printf "  $(INFO) Deploy with: unimart deli switch\n"
-	@printf "  $(INFO) Per-repo extensions: .githooks/<hook-name>\n"
-	@echo ""
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@printf "$(GREEN)Bootstrap complete$(RESET)\n"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+bootstrap: ## Compatibility wrapper for the CLI onboarding flow
+	@if command -v unimart >/dev/null 2>&1; then \
+		unimart deli bootstrap; \
+	else \
+		go run . deli bootstrap; \
+	fi
 
 hooks: ## Show hook status (hooks are Nix-managed — see ADR-005)
 	@printf "$(BOLD)Git Hook Gate System$(RESET)\n"
@@ -178,228 +150,40 @@ hooks: ## Show hook status (hooks are Nix-managed — see ADR-005)
 
 # ── Submodule Management ──────────────────────────────────────────────────
 
-status: ## Show submodule state (dirty, ahead/behind, current ref)
-ifdef HAS_UNIMART
-	@unimart stockroom status
-else
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@printf "$(BOLD)Submodule Status$(RESET)\n"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo ""
-	@for mod in $(SUBMODULES); do \
-		if [ ! -d "$$mod/.git" ] && [ ! -f "$$mod/.git" ]; then \
-			printf "  $(FAIL) %-14s not initialized\n" "$$mod"; \
-			continue; \
-		fi; \
-		\
-		BRANCH=$$(git -C "$$mod" rev-parse --abbrev-ref HEAD 2>/dev/null); \
-		SHORT=$$(git -C "$$mod" rev-parse --short HEAD 2>/dev/null); \
-		TAG=$$(git -C "$$mod" describe --tags --exact-match HEAD 2>/dev/null); \
-		\
-		DIRTY=""; \
-		if [ -n "$$(git -C "$$mod" status --porcelain 2>/dev/null)" ]; then \
-			DIRTY=" $(YELLOW)(dirty)$(RESET)"; \
-		fi; \
-		\
-		REF="$$BRANCH@$$SHORT"; \
-		if [ -n "$$TAG" ]; then \
-			REF="$$TAG ($$BRANCH@$$SHORT)"; \
-		fi; \
-		\
-		printf "  $(CYAN)%-14s$(RESET) %s%b\n" "$$mod" "$$REF" "$$DIRTY"; \
-	done
-	@echo ""
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-endif
-
-update: ## Pull latest main for all submodules
-ifdef HAS_UNIMART
-	@unimart stockroom update
-else
-	@printf "$(BOLD)Updating submodules to latest main...$(RESET)\n"
-	@echo ""
-	@for mod in $(SUBMODULES); do \
-		printf "  $(CYAN)$$mod$(RESET) "; \
-		BEFORE=$$(git -C "$$mod" rev-parse --short HEAD 2>/dev/null); \
-		git -C "$$mod" fetch origin main --quiet 2>/dev/null && \
-		git -C "$$mod" checkout main --quiet 2>/dev/null && \
-		git -C "$$mod" merge --ff-only origin/main --quiet 2>/dev/null && \
-		AFTER=$$(git -C "$$mod" rev-parse --short HEAD 2>/dev/null); \
-		if [ "$$BEFORE" = "$$AFTER" ]; then \
-			printf "already up to date ($$BEFORE)\n"; \
-		else \
-			printf "$$BEFORE → $$AFTER\n"; \
-		fi; \
-	done
-	@echo ""
-	@printf "$(BOLD)Staging updated submodule pointers...$(RESET)\n"
-	@git add $(SUBMODULES)
-	@printf "$(GREEN)Done.$(RESET) Review with 'git diff --cached' then commit.\n"
-endif
-
-drift: ## Check submodule pointers vs remote HEAD
-ifdef HAS_UNIMART
-	@unimart stockroom drift
-else
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@printf "$(BOLD)Drift Check$(RESET)\n"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo ""
-	@DRIFT=0; \
-	for mod in $(SUBMODULES); do \
-		if [ ! -d "$$mod/.git" ] && [ ! -f "$$mod/.git" ]; then \
-			printf "  $(FAIL) %-14s not initialized\n" "$$mod"; \
-			DRIFT=$$((DRIFT + 1)); \
-			continue; \
-		fi; \
-		\
-		git -C "$$mod" fetch origin main --quiet 2>/dev/null; \
-		LOCAL=$$(git -C "$$mod" rev-parse HEAD 2>/dev/null); \
-		REMOTE=$$(git -C "$$mod" rev-parse origin/main 2>/dev/null); \
-		\
-		if [ "$$LOCAL" = "$$REMOTE" ]; then \
-			printf "  $(PASS) %-14s up to date\n" "$$mod"; \
-		else \
-			BEHIND=$$(git -C "$$mod" rev-list --count HEAD..origin/main 2>/dev/null || echo "?"); \
-			AHEAD=$$(git -C "$$mod" rev-list --count origin/main..HEAD 2>/dev/null || echo "?"); \
-			STATUS=""; \
-			if [ "$$BEHIND" != "0" ] && [ "$$BEHIND" != "?" ]; then \
-				STATUS="$$BEHIND behind"; \
-			fi; \
-			if [ "$$AHEAD" != "0" ] && [ "$$AHEAD" != "?" ]; then \
-				if [ -n "$$STATUS" ]; then STATUS="$$STATUS, "; fi; \
-				STATUS="$$STATUS$$AHEAD ahead"; \
-			fi; \
-			printf "  $(WARN) %-14s $$STATUS\n" "$$mod"; \
-			DRIFT=$$((DRIFT + 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	if [ $$DRIFT -eq 0 ]; then \
-		printf "$(GREEN)All submodules in sync$(RESET)\n"; \
+status: ## Compatibility wrapper for stockroom status
+	@if command -v unimart >/dev/null 2>&1; then \
+		unimart stockroom status; \
 	else \
-		printf "$(YELLOW)$$DRIFT submodule(s) drifted — run 'make update' to sync$(RESET)\n"; \
-	fi; \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-endif
+		printf "$(BOLD)stockroom status is available via: unimart stockroom check$(RESET)\n"; \
+		printf "$(INFO) build unimart first with: make build$(RESET)\n"; \
+	fi
+
+update: ## Compatibility wrapper for stockroom update
+	@if command -v unimart >/dev/null 2>&1; then \
+		unimart stockroom update; \
+	else \
+		printf "$(BOLD)stockroom update is available via the CLI$(RESET)\n"; \
+		printf "$(INFO) build unimart first with: make build$(RESET)\n"; \
+	fi
+
+drift: ## Compatibility wrapper for stockroom drift
+	@if command -v unimart >/dev/null 2>&1; then \
+		unimart stockroom drift; \
+	else \
+		printf "$(BOLD)stockroom drift is available via the CLI$(RESET)\n"; \
+		printf "$(INFO) build unimart first with: make build$(RESET)\n"; \
+	fi
+
 
 # ── Cross-Repo ─────────────────────────────────────────────────────────────
 
-ci: ## Validate cross-repo contracts
-ifdef HAS_UNIMART
-	@unimart stockroom check
-else
-	@printf "$(BOLD)idpbuilder — Contract Validation$(RESET)\n"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo ""
-	@ERRORS=0; \
-	\
-	printf "$(BOLD)[1/6] Submodule initialization$(RESET)\n"; \
-	for mod in $(SUBMODULES); do \
-		if [ -d "$$mod/.git" ] || [ -f "$$mod/.git" ]; then \
-			printf "  $(PASS) $$mod\n"; \
-		else \
-			printf "  $(FAIL) $$mod not initialized\n"; \
-			ERRORS=$$((ERRORS + 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	\
-	printf "$(BOLD)[2/6] Remote URLs (security check)$(RESET)\n"; \
-	for mod in $(SUBMODULES); do \
-		REMOTE=$$(git -C "$$mod" remote get-url origin 2>/dev/null); \
-		if echo "$$REMOTE" | grep -q 'github.com[:/]Unimart-For-Operations/'; then \
-			printf "  $(PASS) $$mod → idpbuilder org\n"; \
-		else \
-			printf "  $(FAIL) $$mod → $$REMOTE (UNEXPECTED REMOTE)\n"; \
-			ERRORS=$$((ERRORS + 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	\
-	printf "$(BOLD)[3/6] AGENTS.md presence$(RESET)\n"; \
-	for mod in $(SUBMODULES); do \
-		if [ -f "$$mod/AGENTS.md" ]; then \
-			printf "  $(PASS) $$mod/AGENTS.md\n"; \
-		else \
-			printf "  $(WARN) $$mod/AGENTS.md missing\n"; \
-		fi; \
-	done; \
-	if [ -f "AGENTS.md" ]; then \
-		printf "  $(PASS) AGENTS.md (org root)\n"; \
+ci: ## Compatibility wrapper for stockroom check
+	@if command -v unimart >/dev/null 2>&1; then \
+		unimart stockroom check; \
 	else \
-		printf "  $(FAIL) AGENTS.md (org root) missing\n"; \
-		ERRORS=$$((ERRORS + 1)); \
-	fi; \
-	echo ""; \
-	\
-	printf "$(BOLD)[4/6] Docs directory structure$(RESET)\n"; \
-	for mod in cmdr idpbuilder; do \
-		if [ -d "$$mod/docs" ]; then \
-			MISSING=""; \
-			for subdir in Contributing Getting-Started Reference; do \
-				if [ ! -d "$$mod/docs/$$subdir" ]; then \
-					MISSING="$$MISSING $$subdir"; \
-				fi; \
-			done; \
-			if [ -z "$$MISSING" ]; then \
-				printf "  $(PASS) $$mod/docs/ (Contributing, Getting-Started, Reference)\n"; \
-			else \
-				printf "  $(WARN) $$mod/docs/ missing:$$MISSING\n"; \
-			fi; \
-		else \
-			printf "  $(FAIL) $$mod/docs/ not found\n"; \
-			ERRORS=$$((ERRORS + 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	\
-	printf "$(BOLD)[5/6] Makefile convention$(RESET)\n"; \
-	for mod in $(SUBMODULES); do \
-		if [ ! -f "$$mod/Makefile" ]; then \
-			printf "  $(FAIL) $$mod/Makefile not found\n"; \
-			ERRORS=$$((ERRORS + 1)); \
-			continue; \
-		fi; \
-		MISSING_TARGETS=""; \
-		for tgt in help hooks; do \
-			if ! grep -q "^$$tgt:" "$$mod/Makefile" 2>/dev/null; then \
-				MISSING_TARGETS="$$MISSING_TARGETS $$tgt"; \
-			fi; \
-		done; \
-		if [ -z "$$MISSING_TARGETS" ]; then \
-			printf "  $(PASS) $$mod — help, hooks\n"; \
-		else \
-			printf "  $(WARN) $$mod — missing targets:$$MISSING_TARGETS\n"; \
-		fi; \
-	done; \
-	echo ""; \
-	\
-	printf "$(BOLD)[6/6] Theme export contract$(RESET)\n"; \
-	if [ -x "cmdr/scripts/theme-export.sh" ]; then \
-		printf "  $(PASS) cmdr/scripts/theme-export.sh (producer)\n"; \
-	else \
-		printf "  $(FAIL) cmdr/scripts/theme-export.sh not found\n"; \
-		ERRORS=$$((ERRORS + 1)); \
-	fi; \
-	if [ -f "internal/theme/theme.go" ]; then \
-		printf "  $(PASS) internal/theme/theme.go (consumer — unimart)\n"; \
-	else \
-		printf "  $(WARN) internal/theme/theme.go not found\n"; \
-	fi; \
-	echo ""; \
-	\
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	if [ $$ERRORS -eq 0 ]; then \
-		printf "$(GREEN)All contract checks passed$(RESET)\n"; \
-	else \
-		printf "$(RED)$$ERRORS check(s) failed$(RESET)\n"; \
-		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		exit 1; \
-	fi; \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-endif
+		printf "$(BOLD)stockroom check is available via the CLI$(RESET)\n"; \
+		printf "$(INFO) build unimart first with: make build$(RESET)\n"; \
+	fi
 
 check: ci ## Alias for ci
 
@@ -409,10 +193,10 @@ check: ci ## Alias for ci
 COMPOSE_FILE := containers/podman-compose.yml
 COMPOSE_CMD  := podman-compose -f $(COMPOSE_FILE)
 
-test: ## Run make init integration test in Linux container
+test: ## Run the CLI-first smoke test in a Linux container
 	@printf "$(BOLD)Building test container...$(RESET)\n"
 	@$(COMPOSE_CMD) up -d --build
-	@printf "$(BOLD)Running integration test (this takes several minutes)...$(RESET)\n"
+	@printf "$(BOLD)Running CLI smoke test (this takes several minutes)...$(RESET)\n"
 	@$(COMPOSE_CMD) exec -T init-test bash /workspace/containers/test-init.sh; \
 	EXIT=$$?; \
 	printf "\n$(BOLD)Tearing down container...$(RESET)\n"; \

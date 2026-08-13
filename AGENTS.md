@@ -51,7 +51,7 @@ unimart is distributed through three channels:
 | Channel | Mechanism | When |
 |---------|-----------|------|
 | **Nix (primary)** | cmdr's flake imports `github:Unimart-For-Operations/meta` and includes `unimart` in `home.packages` via `04-modules/cli/graduated/unimart/` | Every `make switch` on every host |
-| **make init** | `scripts/setup.sh` step 6/7 builds from source, symlinks to `~/.local/bin/` | Fresh clones before Nix is configured |
+| **CLI-first bootstrap** | `unimart deli bootstrap` / `go run . deli bootstrap` handles prerequisites and host apply | Fresh clones or first-time machine setup |
 | **make install** | `go build` + symlink to `~/.local/bin/unimart` | Development iteration |
 
 ### Nix distribution details
@@ -66,7 +66,7 @@ The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's f
 
 - **Nix-first**: The user's system is Nix-managed (nix-darwin + home-manager via cmdr). All CLI tooling via Nix. Homebrew only for Colima on macOS.
 - **DCO sign-off**: All repos require `git commit -s` for Developer Certificate of Origin.
-- **Git submodules**: All repos are tracked as submodules in this meta repo (`ignore = dirty`). Use `make bootstrap` for first-time init.
+- **Git submodules**: All repos are tracked as submodules in this meta repo (`ignore = dirty`). Use `unimart deli bootstrap` or `go run . deli bootstrap` for first-time init.
 - **Commit style**: Conventional commits — `feat(scope):`, `fix:`, `docs:`, `refactor:`.
 - **Makefile convention**: All repos use a consistent Makefile style — color output, `.DEFAULT_GOAL := help`, hand-crafted sectioned help, `@`-silenced commands, `## description` comments, `[pass]/[fail]/[warn]` status indicators. After `unimart` is installed, Make targets delegate to it.
 
@@ -76,7 +76,8 @@ The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's f
 go build ./...                 # Compile (fast check for errors)
 go test ./...                  # Run all tests
 make install                   # Build + symlink to ~/.local/bin/unimart
-make init                      # Full bootstrap (fresh clone, no Nix yet)
+unimart deli doctor            # Validate local machine health
+unimart deli bootstrap         # Full setup for a fresh clone or host
 unimart stockroom check        # Run contract validation across org
 ```
 
