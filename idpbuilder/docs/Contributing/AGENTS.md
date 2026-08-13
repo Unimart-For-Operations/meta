@@ -26,15 +26,16 @@ make build               # Compile the binary (generates CRDs, embeds manifests)
 make test                # Run unit tests
 make e2e                 # Run end-to-end tests
 make embedded-resources  # Regenerate embedded manifests from hack/ scripts
-make fetch-upstream      # Fetch latest from cnoe-io/idpbuilder
-make upstream-status     # Show ahead/behind counts vs upstream
-make cherry-pick COMMIT=<sha>  # Cherry-pick a specific upstream commit
 make sync-docs           # Sync docs to cdc vault
 ```
 
 ## Upstream Management
 
 Changes from upstream are cherry-picked, not merged. Load the `upstream-mgmt` skill for the full workflow.
+
+This directory is not its own git repo — it is tracked in-tree by the meta repo, so upstream sync targets
+live in the **meta** Makefile (`make fetch-upstream`, `make upstream-status`, `make cherry-pick COMMIT=<sha>`,
+etc., run from the meta root). See meta's `AGENTS.md`.
 
 **Important:** The Go module path is `github.com/cnoe-io/idpbuilder` — this matches upstream intentionally. References to `cnoe-io` in Go source files and `go.mod` are expected and correct.
 

@@ -1,6 +1,6 @@
 # idpbuilder Organization
 
-This is the meta coordination repo and unified CLI (`unimart`) for the [Unimart-For-Operations](https://github.com/Unimart-For-Operations) GitHub organization. All component repos are tracked as git submodules (with `ignore = dirty`).
+This is the meta coordination repo and unified CLI (`unimart`) for the [Unimart-For-Operations](https://github.com/Unimart-For-Operations) GitHub organization. `cmdr` is tracked as a git submodule (`ignore = dirty`); `idpbuilder` is absorbed in-tree as a tracked directory.
 
 ## unimart CLI
 
@@ -75,9 +75,10 @@ The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's f
 
 - **Nix-first**: The user's system is Nix-managed (nix-darwin + home-manager via cmdr). All CLI tooling via Nix. Homebrew only for Colima on macOS.
 - **DCO sign-off**: All repos require `git commit -s` for Developer Certificate of Origin.
-- **Git submodules**: All repos are tracked as submodules in this meta repo (`ignore = dirty`). Use `unimart deli bootstrap` or `go run . deli bootstrap` for first-time init.
+- **Git submodules**: `cmdr` is the only active submodule (`ignore = dirty`); `idpbuilder` is a tracked directory. Use `unimart deli bootstrap` or `go run . deli bootstrap` for first-time init.
 - **Commit style**: Conventional commits — `feat(scope):`, `fix:`, `docs:`, `refactor:`.
 - **Makefile convention**: All repos use a consistent Makefile style — color output, `.DEFAULT_GOAL := help`, hand-crafted sectioned help, `@`-silenced commands, `## description` comments, `[pass]/[fail]/[warn]` status indicators. After `unimart` is installed, Make targets delegate to it.
+- **Upstream sync**: cnoe-io/idpbuilder changes are cherry-picked, not merged. The `upstream` remote (`git@github.com:cnoe-io/idpbuilder.git`) and the `fetch-upstream` / `upstream-status` / `log-upstream` / `log-upstream-detail` / `diff-upstream` / `cherry-pick COMMIT=<sha>` targets live in the **meta** Makefile. idpbuilder's history in this repo is flat (one absorb commit), so an ancestry-based diff is impossible — compare via `HEAD:idpbuilder ↔ upstream/main` tree diff and apply with `git apply --directory=idpbuilder/`. Load the `upstream-mgmt` skill for the workflow.
 
 ## Development
 

@@ -53,7 +53,7 @@ func buildRootLong() string {
 	return title("unimart") + " — your one-stop shop for the idpbuilder organization.\n\n" +
 		title("Browse the aisles:") + "\n" +
 		"  " + aisle("deli") + "        " + desc("Workstation configuration (Nix/Home Manager)") + "\n" +
-		"  " + aisle("freezer") + "     " + desc("IDP platform lifecycle (clusters, builds, repos)") + "\n" +
+		"  " + aisle("freezer") + "     " + desc("IDP platform lifecycle (clusters, repos)") + "\n" +
 		"  " + aisle("stockroom") + "   " + desc("Cross-repo validation (contract checks)")
 }
 

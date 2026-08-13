@@ -1,4 +1,4 @@
-.PHONY: help init bootstrap status update drift tag hooks ci check test test-shell test-clean build install dev fmt vet completion
+.PHONY: help init bootstrap status update drift tag hooks ci check test test-shell test-clean build install dev fmt vet completion fetch-upstream upstream-status log-upstream log-upstream-detail diff-upstream cherry-pick cherry-pick-range
 
 # Default target
 .DEFAULT_GOAL := help
@@ -59,6 +59,14 @@ help: ## Show this help message
 	@echo ""
 	@printf "$(BOLD)Cross-Repo:$(RESET)\n"
 	@printf "  $(CYAN)ci$(RESET)              Validate cross-repo contracts\n"
+	@echo ""
+	@printf "$(BOLD)Upstream Sync:$(RESET)\n"
+	@printf "  $(CYAN)fetch-upstream$(RESET)    Fetch cnoe-io/idpbuilder refs + tags\n"
+	@printf "  $(CYAN)upstream-status$(RESET)   Summarize divergence from upstream\n"
+	@printf "  $(CYAN)log-upstream$(RESET)      Recent upstream commits\n"
+	@printf "  $(CYAN)log-upstream-detail$(RESET) Recent upstream commits with diffs\n"
+	@printf "  $(CYAN)diff-upstream$(RESET)     Diff idpbuilder/ vs upstream/main\n"
+	@printf "  $(CYAN)cherry-pick$(RESET)       Apply upstream commit (COMMIT=<sha>)\n"
 	@echo ""
 	@printf "$(BOLD)Testing:$(RESET)\n"
 	@printf "  $(CYAN)test$(RESET)            Run make init integration test in Linux container\n"
@@ -188,6 +196,119 @@ ci: ## Compatibility wrapper for stockroom check
 	fi
 
 check: ci ## Alias for ci
+
+# ── Upstream Management (idpbuilder) ────────────────────────────────────────
+#
+# idpbuilder is tracked in-tree at idpbuilder/ but its history here is flat (a
+# single absorb commit), so this repo shares no ancestry with cnoe-io/
+# idpbuilder. Upstream commits carry root-relative paths and are applied with
+# the idpbuilder/ prefix mapped on via git apply --directory. Cherry-picks are
+# never merged; each upstream change lands as its own commit.
+#
+# Set the upstream remote up once:
+#   git remote add upstream git@github.com:cnoe-io/idpbuilder.git
+
+UPSTREAM_REMOTE   := upstream
+UPSTREAM_BRANCH   := main
+UPSTREAM_LOG_COUNT := 20
+UPSTREAM_DETAIL_COUNT := 3
+
+fetch-upstream: ## Fetch latest changes and tags from cnoe-io/idpbuilder
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: git remote add upstream git@github.com:cnoe-io/idpbuilder.git\n"; \
+		exit 1; \
+	fi
+	@printf "$(BOLD)Fetching $(UPSTREAM_REMOTE) (this may take a while)...$(RESET)\n"
+	@git fetch $(UPSTREAM_REMOTE) --tags
+	@printf "  $(PASS) latest upstream: "
+	@git log -1 --format='%s' $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
+	@git log -1 --format='  %h  %ci  %an <%ae>%n' $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
+
+upstream-status: ## Summarize divergence from upstream/main
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: make fetch-upstream\n"; \
+		exit 1; \
+	fi
+	@CHANGED="$$(git diff HEAD:idpbuilder $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) --name-only | wc -l | tr -d ' ')"; \
+	printf "$(BOLD)idpbuilder/ vs $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH):$(RESET)\n"; \
+	if [ "$$CHANGED" -eq 0 ]; then \
+		printf "  $(PASS) in sync with upstream ($$CHANGED files differ)\n"; \
+	else \
+		printf "  $(WARN) $$CHANGED file(s) differ from upstream\n"; \
+	fi; \
+	printf "  $(INFO) our subtree:  "; git log -1 --format='%h %ci' HEAD; \
+	printf "  $(INFO) upstream ref: "; git log -1 --format='%h %ci' $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH); \
+	printf "  $(INFO) upstream tag: "; git describe --tags --first-parent --abbrev=0 $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) 2>/dev/null || echo "(none)"
+	@git diff HEAD:idpbuilder $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) --stat --color=always
+
+log-upstream: ## Show recent upstream commits (disconnected history — no merge-base)
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: make fetch-upstream\n"; \
+		exit 1; \
+	fi
+	@git log --oneline --max-count=$(UPSTREAM_LOG_COUNT) $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
+
+log-upstream-detail: ## Show recent upstream commits with diffs (COUNT=<n>)
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: make fetch-upstream\n"; \
+		exit 1; \
+	fi
+	@git log -p --max-count=$(UPSTREAM_DETAIL_COUNT) $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
+
+diff-upstream: ## Diff idpbuilder/ subtree against upstream/main
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: make fetch-upstream\n"; \
+		exit 1; \
+	fi
+	@git diff HEAD:idpbuilder $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) --color=always
+
+cherry-pick: ## Apply an upstream commit into idpbuilder/: make cherry-pick COMMIT=<sha>
+	@if [ -z "$(COMMIT)" ]; then \
+		printf "  $(FAIL) usage: make cherry-pick COMMIT=<sha> (then review and git commit -s)\n"; \
+		exit 1; \
+	fi
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: git remote add upstream git@github.com:cnoe-io/idpbuilder.git\n"; \
+		exit 1; \
+	fi
+	@if ! git cat-file -e "$(COMMIT)^{commit}" 2>/dev/null; then \
+		printf "  $(FAIL) commit $(COMMIT) not found — run: make fetch-upstream\n"; \
+		exit 1; \
+	fi
+	@if ! git merge-base --is-ancestor "$(COMMIT)" $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) 2>/dev/null; then \
+		printf "  $(FAIL) $(COMMIT) is not part of $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) history — refusing to apply\n"; \
+		exit 1; \
+	fi
+	@printf "$(BOLD)Applying $(COMMIT) into idpbuilder/...$(RESET)\n"
+	@git format-patch -1 "$(COMMIT)" --stdout | git apply --directory=idpbuilder/ --3way --index || { \
+		printf "  $(FAIL) apply failed — no changes staged; resolve upstream divergence or pick another commit\n"; \
+		exit 1; \
+	}
+	@printf "  $(PASS) applied — staged changes:\n"
+	@git diff --cached --stat -- idpbuilder/
+	@printf "  $(INFO) commit them with: git commit -s -m \"feat(idpbuilder): ...\"\n"
+
+cherry-pick-range: ## Apply an upstream commit range into idpbuilder/: make cherry-pick-range FROM=<sha> TO=<sha>
+	@if [ -z "$(FROM)" ] || [ -z "$(TO)" ]; then \
+		printf "  $(FAIL) usage: make cherry-pick-range FROM=<sha> TO=<sha>\n"; \
+		exit 1; \
+	fi
+	@if ! git remote get-url $(UPSTREAM_REMOTE) >/dev/null 2>&1; then \
+		printf "  $(FAIL) upstream remote not configured — run: git remote add upstream git@github.com:cnoe-io/idpbuilder.git\n"; \
+		exit 1; \
+	fi
+	@if ! git merge-base --is-ancestor "$(TO)" $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) 2>/dev/null; then \
+		printf "  $(FAIL) $(TO) is not part of $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) history — refusing to apply\n"; \
+		exit 1; \
+	fi
+	@printf "$(BOLD)Applying $(FROM)..$(TO) into idpbuilder/...$(RESET)\n"
+	@git format-patch "$(FROM)..$(TO)" --stdout | git apply --directory=idpbuilder/ --3way --index || { \
+		printf "  $(FAIL) apply failed — no changes staged; resolve upstream divergence or pick another range\n"; \
+		exit 1; \
+	}
+	@printf "  $(PASS) applied — staged changes:\n"
+	@git diff --cached --stat -- idpbuilder/
+	@printf "  $(INFO) commit them with: git commit -s -m \"feat(idpbuilder): ...\"\n"
 
 # ── Testing (container-based) ──────────────────────────────────────────────
 

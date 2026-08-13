@@ -99,65 +99,6 @@ embedded-resources: kustomize helm
 e2e: build
 	go test -v -p 1 -timeout 15m --tags=e2e ./tests/e2e/...
 
-# ─── Upstream Management ────────────────────────────────────────────
-# Targets for tracking and cherry-picking changes from cnoe-io/idpbuilder.
-# The 'upstream' remote should point to git@github.com:cnoe-io/idpbuilder.git
-#
-# Workflow:
-#   make fetch-upstream          # fetch latest upstream changes
-#   make log-upstream            # see what's new since we diverged
-#   make diff-upstream           # diff our main vs upstream/main
-#   make cherry-pick COMMIT=abc  # cherry-pick a specific upstream commit
-
-UPSTREAM_REMOTE ?= upstream
-UPSTREAM_BRANCH ?= main
-
-.PHONY: fetch-upstream
-fetch-upstream: ## Fetch latest changes and tags from cnoe-io/idpbuilder
-	@echo "Fetching from $(UPSTREAM_REMOTE)..."
-	@git fetch $(UPSTREAM_REMOTE) --tags
-	@echo "Latest upstream commit:"
-	@git log -1 --oneline $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
-
-.PHONY: log-upstream
-log-upstream: ## Show upstream commits not yet in our main branch
-	@echo "Commits in $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) not in HEAD:"
-	@git log --oneline HEAD..$(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
-
-.PHONY: log-upstream-detail
-log-upstream-detail: ## Show upstream commits with diffs (detailed)
-	@git log -p HEAD..$(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)
-
-.PHONY: diff-upstream
-diff-upstream: ## Show diff between our main and upstream/main
-	@git diff HEAD...$(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH) --stat
-
-.PHONY: cherry-pick
-cherry-pick: ## Cherry-pick a specific upstream commit (usage: make cherry-pick COMMIT=<sha>)
-ifndef COMMIT
-	$(error COMMIT is required. Usage: make cherry-pick COMMIT=<sha>)
-endif
-	@echo "Cherry-picking $(COMMIT)..."
-	@git cherry-pick $(COMMIT)
-
-.PHONY: cherry-pick-range
-cherry-pick-range: ## Cherry-pick a range of upstream commits (usage: make cherry-pick-range FROM=<sha> TO=<sha>)
-ifndef FROM
-	$(error FROM is required. Usage: make cherry-pick-range FROM=<sha> TO=<sha>)
-endif
-ifndef TO
-	$(error TO is required. Usage: make cherry-pick-range FROM=<sha> TO=<sha>)
-endif
-	@echo "Cherry-picking range $(FROM)..$(TO)..."
-	@git cherry-pick $(FROM)..$(TO)
-
-.PHONY: upstream-status
-upstream-status: ## Show how far ahead/behind we are from upstream
-	@echo "Our main vs $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH):"
-	@printf "  Ahead:  %s\n" "$$(git rev-list --count $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH)..HEAD)"
-	@printf "  Behind: %s\n" "$$(git rev-list --count HEAD..$(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH))"
-	@printf "  Last upstream fetch: %s\n" "$$(git log -1 --format='%ci' $(UPSTREAM_REMOTE)/$(UPSTREAM_BRANCH))"
-
 # ─── Documentation ─────────────────────────────────────────────────
 ORG_DIR := $(shell dirname $(CURDIR))
 
