@@ -208,11 +208,14 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends podman podman-compose make curl
-          # vfs storage avoids overlay-in-overlay inside the privileged job container
-          mkdir -p /etc/containers
-          printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf
+          # vfs storage avoids overlay-in-overlay inside the privileged job
+          # container; explicit runroot/graphroot are required for vfs in
+          # podman 4.x (default runroot under /run is not usable in this job).
+          mkdir -p /var/tmp/containers/runroot /var/tmp/containers/graphroot
+          printf '[storage]\ndriver = "vfs"\nrunroot = "/var/tmp/containers/runroot"\ngraphroot = "/var/tmp/containers/graphroot"\n' > /etc/containers/storage.conf
           podman --version
           podman-compose --version
+          podman info --format 'graph-driver={{.Store.GraphDriverName}} runroot={{.Store.RunRoot}}'
 
       - name: make test
         run: make test
