@@ -30,7 +30,13 @@
             pname = "unimart";
             version = version;
             src = ./.;
-            vendorHash = "sha256-DWBIYmPJADeC8HD5bKw7H0c2/Xu+Jp/UkLO4wr5L1Jk=";
+            vendorHash = "sha256-WpPyHmBX3uxIHZ5JkzOFY5ZMumZutkcI1a3GmvLL1+k=";
+
+            # Build only the root package. The nested idpbuilder module
+            # (./idpbuilder) is imported via replace => ./idpbuilder and is
+            # compiled transitively, so auto-discovering it as a subpackage
+            # would mis-treat it as part of the main module.
+            subPackages = [ "." ];
 
             # Unit tests (internal/repos) shell out to `git` (e.g. `git init`
             # for temp test repos); make it available during the check phase.
@@ -69,7 +75,7 @@
 
         formatter = pkgs.writeShellApplication {
           name = "meta-nixfmt";
-          runtimeInputs = [ pkgs.nixfmt-rfc-style ];
+          runtimeInputs = [ pkgs.nixfmt ];
           text = ''
             check=0
             if [ "''${1:-}" = "--check" ]; then
@@ -77,7 +83,10 @@
               shift
             fi
 
-            mapfile -t files < <(git ls-files '*.nix')
+            # Exclude Backstage scaffolder templates: their *.nix skeletons
+            # carry scaffolder placeholders (dollar-brace pairs) that are
+            # invalid as Nix by design, so nixfmt cannot parse them.
+            mapfile -t files < <(git ls-files '*.nix' | grep -v 'scaffolder-templates/')
             if [ "''${#files[@]}" -eq 0 ]; then
               exit 0
             fi
