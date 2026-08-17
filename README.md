@@ -124,7 +124,7 @@ The repo-level Makefile no longer owns onboarding or org-wide orchestration. It 
 | [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder (private fork of cnoe-io/idpbuilder) | Go |
 | [idpctl](idpctl/) | CLI lifecycle tool for idpbuilder (deprecated — absorbed into unimart) | Go |
 | [docs](docs/) | Documentation aggregation hub (transitional — being replaced by cdc) | Shell/Markdown |
-| [cdc](unimart-employee-handbooks/cdc/) | Obsidian vault — synced doc mirrors + org knowledge base | Markdown |
+| [cdc](unimart-employee-handbooks/cdc/) | Obsidian vault — synced doc mirrors + org knowledge base (github.com/idpbuilder/cdc) | Markdown |
 
 ## Install Methods
 

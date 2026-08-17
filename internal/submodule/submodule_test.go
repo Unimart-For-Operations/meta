@@ -25,7 +25,7 @@ const gitmodulesContent = `[submodule "cmdr"]
 	ignore = dirty
 [submodule "unimart-employee-handbooks/cdc"]
 	path = unimart-employee-handbooks/cdc
-	url = git@github.com:Unimart-For-Operations/cdc.git
+	url = git@github.com:idpbuilder/cdc.git
 	ignore = dirty
 `
 
@@ -52,7 +52,7 @@ func TestParseGitmodules(t *testing.T) {
 		{"idpbuilder", "idpbuilder", "git@github.com:Unimart-For-Operations/idpbuilder.git"},
 		{"idpctl", "idpctl", "git@github.com:Unimart-For-Operations/idpctl.git"},
 		{"docs", "docs", "git@github.com:Unimart-For-Operations/docs.git"},
-		{"unimart-employee-handbooks/cdc", "unimart-employee-handbooks/cdc", "git@github.com:Unimart-For-Operations/cdc.git"},
+		{"unimart-employee-handbooks/cdc", "unimart-employee-handbooks/cdc", "git@github.com:idpbuilder/cdc.git"},
 	}
 
 	for i, e := range expected {

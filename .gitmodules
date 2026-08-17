@@ -2,3 +2,6 @@
 	path = cmdr
 	url = git@github.com:Unimart-For-Operations/cmdr.git
 	branch = main
+[submodule "unimart-employee-handbooks/cdc"]
+	path = unimart-employee-handbooks/cdc
+	url = git@github.com:idpbuilder/cdc.git
