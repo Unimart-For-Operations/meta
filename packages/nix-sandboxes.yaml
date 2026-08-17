@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nix-sandboxes
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    namespace: sandboxes
+    server: "https://kubernetes.default.svc"
+  source:
+    repoURL: cnoe://nix-sandboxes
+    targetRevision: HEAD
+    path: "."
+    directory:
+      recurse: true
+      # catalog-info.yaml is a Backstage entity, not a K8s manifest.
+      exclude: "sandboxes/**/catalog-info.yaml"
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 5m

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-sandbox-terminal
+  namespace: sandboxes
+  labels:
+    app: example-sandbox-terminal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example-sandbox-terminal
+  template:
+    metadata:
+      labels:
+        app: example-sandbox-terminal
+        backstage.io/kubernetes-id: example-sandbox
+    spec:
+      serviceAccountName: example-sandbox
+      containers:
+        # ttyd exposes an in-browser terminal into the sandbox pod's shell.
+        # --writable lets the browser terminal run interactive commands.
+        - name: terminal
+          image: docker.io/library/terminal:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SANDBOX_NAME
+              value: example-sandbox
+            - name: SANDBOX_CONTAINER
+              value: nix
+          command: ["/terminal-entrypoint.sh"]
+          ports:
+            - name: http
+              containerPort: 7681
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-sandbox-terminal
+  namespace: sandboxes
+  labels:
+    app: example-sandbox-terminal
+spec:
+  selector:
+    app: example-sandbox-terminal
+  ports:
+    - name: http
+      port: 80
+      targetPort: 7681
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example-sandbox-terminal
+  namespace: sandboxes
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: example-sandbox-terminal.cnoe.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: example-sandbox-terminal
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - example-sandbox-terminal.cnoe.localtest.me
+      secretName: idpbuilder-cert
