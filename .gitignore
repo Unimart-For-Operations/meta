@@ -38,3 +38,6 @@ repositories/backstage-templates/
 
 # Pending submodule registration (needs GitHub repo + gh auth)
 /docs-service/
+
+# idpbuilder runtime artifacts (Gitea workflows written into the tree)
+idpbuilder/.gitea/
