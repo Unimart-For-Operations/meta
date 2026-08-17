@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ values.name }}-sandbox
+  namespace: sandboxes
+  labels:
+    app: ${{ values.name }}-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ values.name }}-sandbox
+  template:
+    metadata:
+      labels:
+        app: ${{ values.name }}-sandbox
+        backstage.io/kubernetes-id: ${{ values.name }}
+    spec:
+      serviceAccountName: ${{ values.name }}-sandbox
+      containers:
+        - name: nix
+          image: ${{ values.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Nix sandbox '${{ values.name }}' ready"
+              sleep infinity
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi

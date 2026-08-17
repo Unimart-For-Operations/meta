@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${{ values.name }}-sandbox
+  namespace: sandboxes
+---
+# Terminal access: allows kubectl exec into the sandbox's own pod so the
+# ttyd browser shell can attach to the `nix` container.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${{ values.name }}-exec
+  namespace: sandboxes
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${{ values.name }}-exec
+  namespace: sandboxes
+subjects:
+  - kind: ServiceAccount
+    name: ${{ values.name }}-sandbox
+    namespace: sandboxes
+roleRef:
+  kind: Role
+  name: ${{ values.name }}-exec
+  apiGroup: rbac.authorization.k8s.io

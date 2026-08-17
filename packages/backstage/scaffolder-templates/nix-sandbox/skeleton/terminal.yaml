@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ values.name }}-terminal
+  namespace: sandboxes
+  labels:
+    app: ${{ values.name }}-terminal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ values.name }}-terminal
+  template:
+    metadata:
+      labels:
+        app: ${{ values.name }}-terminal
+        backstage.io/kubernetes-id: ${{ values.name }}
+    spec:
+      serviceAccountName: ${{ values.name }}-sandbox
+      containers:
+        # ttyd exposes an in-browser terminal that kubectl-execs into the
+        # sandbox's own `nix` container.
+        - name: terminal
+          image: docker.io/library/terminal:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SANDBOX_NAME
+              value: ${{ values.name }}-sandbox
+            - name: SANDBOX_CONTAINER
+              value: nix
+          command: ["/terminal-entrypoint.sh"]
+          ports:
+            - name: http
+              containerPort: 7681
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ values.name }}-terminal
+  namespace: sandboxes
+  labels:
+    app: ${{ values.name }}-terminal
+spec:
+  selector:
+    app: ${{ values.name }}-terminal
+  ports:
+    - name: http
+      port: 80
+      targetPort: 7681
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ values.name }}-terminal
+  namespace: sandboxes
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ${{ values.name }}-terminal.${{ values.terminalHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ values.name }}-terminal
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - ${{ values.name }}-terminal.${{ values.terminalHost }}
+      secretName: idpbuilder-cert

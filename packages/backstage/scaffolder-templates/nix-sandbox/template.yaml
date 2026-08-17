@@ -1,0 +1,121 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: nix-sandbox
+  title: Nix Sandbox
+  description: Provision an ephemeral Nix sandbox with an in-browser terminal, deployed via the shared nix-sandboxes repo
+  tags:
+    - nix
+    - sandbox
+    - terminal
+    - ephemeral
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Sandbox Information
+      required:
+        - name
+        - description
+      properties:
+        name:
+          title: Sandbox Name
+          type: string
+          description: Unique name for this sandbox (lowercase, hyphens allowed)
+          pattern: '^[a-z][a-z0-9-]*$'
+          ui:autofocus: true
+          ui:help: 'Example: ml-lab, build-env'
+
+        description:
+          title: Description
+          type: string
+          description: Short description of what this sandbox is for
+
+        owner:
+          title: Owner
+          type: string
+          description: Team or user responsible for this sandbox
+          default: platform-team
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+
+    - title: Container
+      required:
+        - image
+      properties:
+        image:
+          title: Container Image
+          type: string
+          description: The Nix (or compatible) container image to run
+          default: nixos/nix:latest
+          ui:help: 'Defaults to nixos/nix:latest'
+
+        terminalHost:
+          title: Terminal Hostname Suffix
+          type: string
+          description: Subdomain for the in-browser terminal
+          default: cnoe.localtest.me
+          ui:help: 'Resulting URL: <name>-terminal.<suffix>'
+
+    - title: Repository
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Nix Sandboxes Repository
+          type: string
+          ui:field: RepoUrlPicker
+          description: The shared repository where sandbox manifests are appended
+          ui:options:
+            allowedHosts:
+              - my-gitea-http.gitea.svc.cluster.local:3000
+            allowedOwners:
+              - giteaAdmin
+
+  steps:
+    - id: fetch-base
+      name: Fetch Sandbox Skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        copyWithoutTemplating:
+          - '**/*.png'
+          - '**/*.jpg'
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          image: ${{ parameters.image }}
+          terminalHost: ${{ parameters.terminalHost }}
+
+    - id: commit-shared
+      name: Commit to Shared Nix Sandboxes Repo
+      action: gitea:commit
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        branch: main
+        commitMessage: 'Add nix sandbox ${{ parameters.name }}'
+        gitAuthorName: Scaffolder
+        gitAuthorEmail: scaffolder@backstage.io
+        sourcePath: .
+        targetPath: sandboxes/${{ parameters.name }}
+
+    - id: register
+      name: Register Component in Catalog
+      action: catalog:register
+      input:
+        catalogInfoUrl: ${{ steps.commit-shared.output.catalogInfoUrl }}
+        optional: true
+
+  output:
+    links:
+      - title: Terminal
+        url: https://${{ parameters.name }}-terminal.${{ parameters.terminalHost }}
+      - title: Repository
+        url: ${{ steps.commit-shared.output.repoContentsUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
