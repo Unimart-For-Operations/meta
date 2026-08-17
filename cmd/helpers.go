@@ -200,21 +200,27 @@ func dockerEndpointIsPodman() bool {
 	return strings.Contains(os.Getenv("DOCKER_HOST"), "/podman/")
 }
 
-// buildCustomImages builds custom container images (backstage-platform).
-// It skips gracefully if the source directory doesn't exist.
+// buildCustomImages builds custom container images (backstage-platform,
+// terminal). It skips gracefully if a source directory doesn't exist.
 func buildCustomImages(stepLabel, orgDir string) error {
 	fmt.Printf("\n%s Building custom container images\n\n", bold(stepLabel))
 
-	// Check if backstage-platform exists
+	// Build backstage-platform image
 	backstageDir := filepath.Join(orgDir, "repositories", "backstage-platform")
 	if _, err := os.Stat(backstageDir); err != nil {
 		fmt.Printf("  %s backstage-platform not found, skipping\n", warn("[warn]"))
 		return nil
 	}
-
-	// Build backstage-platform image
 	if err := builder.BuildBackstagePlatform(orgDir, verbose); err != nil {
 		return fmt.Errorf("backstage-platform build failed: %w", err)
+	}
+
+	// Build terminal image
+	terminalDir := filepath.Join(orgDir, "containers", "terminal")
+	if _, err := os.Stat(terminalDir); err != nil {
+		fmt.Printf("  %s terminal not found, skipping\n", warn("[warn]"))
+	} else if err := builder.BuildTerminal(orgDir, verbose); err != nil {
+		return fmt.Errorf("terminal build failed: %w", err)
 	}
 
 	fmt.Printf("  %s all custom images built\n", pass("[ok]"))
@@ -226,7 +232,7 @@ func buildCustomImages(stepLabel, orgDir string) error {
 func loadCustomImages(stepLabel string) error {
 	fmt.Printf("\n%s Loading custom images into Kind\n\n", bold(stepLabel))
 
-	images := []string{"backstage-platform:latest"}
+	images := []string{"backstage-platform:latest", "terminal:latest"}
 
 	for _, img := range images {
 		// Check if image exists locally

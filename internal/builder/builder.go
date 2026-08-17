@@ -80,6 +80,44 @@ func BuildBackstagePlatform(orgDir string, verbose bool) error {
 	return nil
 }
 
+// BuildTerminal builds the terminal (ttyd + kubectl) Docker image from
+// containers/terminal. It requires Docker to be running.
+func BuildTerminal(orgDir string, verbose bool) error {
+	terminalDir := filepath.Join(orgDir, "containers", "terminal")
+
+	if _, err := os.Stat(terminalDir); err != nil {
+		return fmt.Errorf("terminal source not found at %s", terminalDir)
+	}
+
+	dockerfile := filepath.Join(terminalDir, "Dockerfile")
+	if _, err := os.Stat(dockerfile); err != nil {
+		return fmt.Errorf("Dockerfile not found at %s", dockerfile)
+	}
+
+	fmt.Println("  Building terminal:latest...")
+
+	args := []string{
+		"build",
+		"-t", "terminal:latest",
+		"-f", "Dockerfile",
+		".",
+	}
+
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = terminalDir
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker build failed: %w", err)
+	}
+
+	fmt.Println("  terminal:latest built successfully")
+	return nil
+}
+
 // LoadImageIntoKind loads a Docker image into the Kind cluster.
 // It auto-detects the Kind cluster name (defaults to "localdev").
 func LoadImageIntoKind(image string, verbose bool) error {
