@@ -87,7 +87,7 @@ spec:
           image: ${{ parameters.image }}
           terminalHost: ${{ parameters.terminalHost }}
 
-    - id: commit-shared
+    - id: commitShared
       name: Commit to Shared Nix Sandboxes Repo
       action: gitea:commit
       input:
@@ -103,7 +103,7 @@ spec:
       name: Register Component in Catalog
       action: catalog:register
       input:
-        catalogInfoUrl: ${{ steps.commit-shared.output.catalogInfoUrl }}
+        catalogInfoUrl: ${{ steps.commitShared.output.catalogInfoUrl }}
         optional: true
 
   output:
@@ -111,7 +111,7 @@ spec:
       - title: Terminal
         url: https://${{ parameters.name }}-terminal.${{ parameters.terminalHost }}
       - title: Repository
-        url: ${{ steps.commit-shared.output.repoContentsUrl }}
+        url: ${{ steps.commitShared.output.repoContentsUrl }}
       - title: Open in Catalog
         icon: catalog
         entityRef: ${{ steps.register.output.entityRef }}
