@@ -67,13 +67,9 @@ spec:
         repoUrl:
           title: Nix Sandboxes Repository
           type: string
-          ui:field: RepoUrlPicker
           description: The shared repository where sandbox manifests are appended
-          ui:options:
-            allowedHosts:
-              - my-gitea-http.gitea.svc.cluster.local:3000
-            allowedOwners:
-              - giteaAdmin
+          default: gitea:my-gitea-http.gitea.svc.cluster.local:3000/giteaAdmin/idpbuilder-localdev-nix-sandboxes-nix-sandboxes
+          ui:help: 'Leave as-is. This is the Gitea repo created by idpbuilder from cnoe://nix-sandboxes.'
 
   steps:
     - id: fetch-base
