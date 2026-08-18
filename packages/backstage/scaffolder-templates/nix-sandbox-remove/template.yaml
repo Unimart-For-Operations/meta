@@ -1,0 +1,53 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: remove-nix-sandbox
+  title: Remove Nix Sandbox
+  description: Tear down an ephemeral Nix sandbox by deleting its manifests from the shared nix-sandboxes repo. ArgoCD prunes the running workloads.
+  tags:
+    - nix
+    - sandbox
+    - terminal
+    - ephemeral
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Sandbox Removal
+      required:
+        - name
+      properties:
+        name:
+          title: Sandbox Name
+          type: string
+          description: Name of the sandbox to remove (must match the deployed sandbox)
+          pattern: '^[a-z][a-z0-9-]*$'
+          ui:autofocus: true
+          ui:help: 'Example: ml-lab, build-env'
+
+    - title: Repository
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Nix Sandboxes Repository
+          type: string
+          description: The shared repository containing the sandbox manifests
+          default: my-gitea-http.gitea.svc.cluster.local:3000?owner=giteaAdmin&repo=idpbuilder-localdev-nix-sandboxes-nix-sandboxes
+          ui:help: 'Leave as-is. This is the Gitea repo created by idpbuilder from cnoe://nix-sandboxes.'
+
+  steps:
+    - id: removeSandbox
+      name: Delete Sandbox Manifests
+      action: gitea:delete-dir
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        branch: main
+        commitMessage: 'Remove nix sandbox ${{ parameters.name }}'
+        targetPath: sandboxes/${{ parameters.name }}
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.removeSandbox.output.repoContentsUrl }}

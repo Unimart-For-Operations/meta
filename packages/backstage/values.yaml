@@ -167,6 +167,10 @@ backstage:
             target: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/backstage-templates/raw/branch/main/nix-sandbox/template.yaml
             rules:
               - allow: [Template]
+          - type: url
+            target: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/backstage-templates/raw/branch/main/nix-sandbox-remove/template.yaml
+            rules:
+              - allow: [Template]
           # Org services (deployed deliberately, e.g. unimart freezer docs up)
           - type: url
             target: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/docs-service/raw/branch/main/catalog-info.yaml
