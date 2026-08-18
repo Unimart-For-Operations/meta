@@ -131,12 +131,18 @@ sandbox runtime image from `containers/sandbox`:
 
 - `containers/sandbox/flake.nix` defines a pinned `ttyProfile` (`pkgs.buildEnv`
   of the bare-minimum TTY toolset: zsh, tmux, nvim, yazi, starship, fzf,
-  zoxide, bat, eza, git, ripgrep, fd, openssh).
+  zoxide, bat, eza, git, ripgrep, fd, openssh, opencode).
 - The Dockerfile builds that profile inside a `nixos/nix` build stage and
   copies the store + profile into the final image, so sandbox pods start with
   the toolset pre-baked (no per-pod install).
 - Minimal rc files (`zshrc`, `tmux.conf`, `starship.toml`) are baked in so the
   sandbox shell feels like a real tty-engineer workstation.
+- `BuildSandbox` auto-copies the user's AstroNvim config
+  (`cmdr/home/04-modules/tui/graduated/nvim/nvim-astro`) into the build
+  context before `docker build`, so the sandbox's `nvim` launches nvim-astro
+  (plugins lazy-fetch on first run) and its tmux keybindings match the cmdr
+  tmux module (prefix `C-Space`, vim pane nav, `|`/`-` splits). The copy is
+  skipped with a warning when cmdr is absent.
 
 ### 3.2 `cmd/helpers.go`
 
@@ -173,7 +179,8 @@ scaffolder produces.
 - One container, `nix`, running `docker.io/library/sandbox-tty:latest` with
   `imagePullPolicy: IfNotPresent`. The image is built from `containers/sandbox`
   during `unimart open`/`reload` and carries the bare-minimum TTY toolset
-  (zsh, tmux, nvim, yazi, starship, fzf, zoxide, bat, eza, git).
+  (zsh, tmux, nvim, yazi, starship, fzf, zoxide, bat, eza, git, opencode), the
+  user's nvim-astro editor config, and tmux keybindings matching cmdr.
 - Command keeps the pod alive: `echo "Nix sandbox 'example' ready"; sleep
   infinity`.
 - Resource requests/limits: `100m/256Mi` request, `1 CPU/1Gi` limit.

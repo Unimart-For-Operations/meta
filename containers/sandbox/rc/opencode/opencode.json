@@ -1,0 +1,6 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "You are working inside an ephemeral Nix TTY sandbox pods."
+  ]
+}

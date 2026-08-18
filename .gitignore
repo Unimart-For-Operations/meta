@@ -36,6 +36,9 @@ packages/backstage/templates/secret.yaml
 repositories/backstage-platform/
 repositories/backstage-templates/
 
+# Build-time copies of cmdr configs (populated by BuildSandbox before docker build)
+containers/sandbox/hm/
+
 # Pending submodule registration (needs GitHub repo + gh auth)
 /docs-service/
 

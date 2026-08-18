@@ -26,6 +26,7 @@
             fzf
             git
             neovim
+            opencode
             openssh
             ripgrep
             starship
