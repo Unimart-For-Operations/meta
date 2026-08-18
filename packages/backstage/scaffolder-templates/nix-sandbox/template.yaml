@@ -58,7 +58,7 @@ spec:
           type: string
           description: Subdomain for the in-browser terminal
           default: cnoe.localtest.me
-          ui:help: 'Resulting URL: <name>-terminal.<suffix>'
+          ui:help: 'Resulting URL: <name>-terminal.<suffix>:8443'
 
     - title: Repository
       required:
@@ -109,7 +109,7 @@ spec:
   output:
     links:
       - title: Terminal
-        url: https://${{ parameters.name }}-terminal.${{ parameters.terminalHost }}
+        url: https://${{ parameters.name }}-terminal.${{ parameters.terminalHost }}:8443
       - title: Repository
         url: ${{ steps.commitShared.output.repoContentsUrl }}
       - title: Open in Catalog

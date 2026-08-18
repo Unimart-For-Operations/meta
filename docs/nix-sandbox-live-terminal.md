@@ -259,12 +259,12 @@ The mirror that Backstage actually reads is `repositories/backstage-templates/
 nix-sandbox/` in this repo (published to gitea; gitignored in meta so it does
 not double-track). The `terminalHost` parameter defaults to
 `cnoe.localtest.me`, so the advertised URL is
-`https://<name>-terminal.cnoe.localtest.me`.
+`https://<name>-terminal.cnoe.localtest.me:8443`.
 
-> **Note:** the template link omits the `:8443` port. The IDP's nginx ingress
-> is only reachable through the host's mapped port `8443` (see §6.3), so the
-> fully-working URL in the current environment is
-> `https://<name>-terminal.cnoe.localtest.me:8443/`.
+> **Note:** both the scaffold output link and the per-sandbox `catalog-info.yaml`
+> link now include the `:8443` port. The IDP's nginx ingress is only reachable
+> through the host's mapped port `8443` (see §6.3), so without that port the
+> browser hits `127.0.0.1:443` where nothing listens.
 
 ---
 

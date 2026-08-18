@@ -10,7 +10,7 @@ metadata:
     - nix
     - sandbox
   links:
-    - url: https://${{ values.name }}-terminal.${{ values.terminalHost }}
+    - url: https://${{ values.name }}-terminal.${{ values.terminalHost }}:8443
       title: Terminal
 spec:
   type: service
