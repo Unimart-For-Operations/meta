@@ -118,6 +118,44 @@ func BuildTerminal(orgDir string, verbose bool) error {
 	return nil
 }
 
+// BuildSandbox builds the sandbox-tty Docker image from containers/sandbox.
+// It requires Docker to be running.
+func BuildSandbox(orgDir string, verbose bool) error {
+	sandboxDir := filepath.Join(orgDir, "containers", "sandbox")
+
+	if _, err := os.Stat(sandboxDir); err != nil {
+		return fmt.Errorf("sandbox source not found at %s", sandboxDir)
+	}
+
+	dockerfile := filepath.Join(sandboxDir, "Dockerfile")
+	if _, err := os.Stat(dockerfile); err != nil {
+		return fmt.Errorf("Dockerfile not found at %s", dockerfile)
+	}
+
+	fmt.Println("  Building sandbox-tty:latest...")
+
+	args := []string{
+		"build",
+		"-t", "sandbox-tty:latest",
+		"-f", "Dockerfile",
+		".",
+	}
+
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = sandboxDir
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker build failed: %w", err)
+	}
+
+	fmt.Println("  sandbox-tty:latest built successfully")
+	return nil
+}
+
 // LoadImageIntoKind loads a Docker image into the Kind cluster.
 // It auto-detects the Kind cluster name (defaults to "localdev").
 func LoadImageIntoKind(image string, verbose bool) error {

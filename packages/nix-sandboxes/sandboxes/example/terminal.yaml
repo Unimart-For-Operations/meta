@@ -28,6 +28,8 @@ spec:
               value: example-sandbox
             - name: SANDBOX_CONTAINER
               value: nix
+            - name: SHELL_CMD
+              value: /bin/zsh
           command: ["/terminal-entrypoint.sh"]
           ports:
             - name: http

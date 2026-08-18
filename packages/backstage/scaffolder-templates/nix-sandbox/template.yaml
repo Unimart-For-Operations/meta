@@ -50,8 +50,8 @@ spec:
           title: Container Image
           type: string
           description: The Nix (or compatible) container image to run
-          default: nixos/nix:latest
-          ui:help: 'Defaults to nixos/nix:latest'
+          default: docker.io/library/sandbox-tty:latest
+          ui:help: 'Defaults to sandbox-tty (zsh, tmux, nvim, yazi, starship, fzf, zoxide, bat, eza, git). Override with any Nix-capable image.'
 
         terminalHost:
           title: Terminal Hostname Suffix

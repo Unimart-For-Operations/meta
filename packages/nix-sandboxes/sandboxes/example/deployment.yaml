@@ -19,7 +19,7 @@ spec:
       containers:
         # Keep the sandbox alive; the terminal sidecar is the access point.
         - name: nix
-          image: nixos/nix:latest
+          image: docker.io/library/sandbox-tty:latest
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh

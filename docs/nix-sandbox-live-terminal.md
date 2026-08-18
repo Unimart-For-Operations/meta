@@ -114,6 +114,7 @@ shipped in the image.
 
 The terminal image is not a platform service; it is a **custom image built
 during `unimart open` / `unimart reload`**, alongside `backstage-platform`.
+The sandbox runtime image (`sandbox-tty`, §4.1) is built in the same pass.
 
 ### 3.1 `internal/builder/builder.go`
 
@@ -125,13 +126,26 @@ during `unimart open` / `unimart reload`**, alongside `backstage-platform`.
   context set to the terminal dir.
 - Streams output only when the CLI is verbose.
 
+`BuildSandbox(orgDir string, verbose bool) error` (builder.go:120) builds the
+sandbox runtime image from `containers/sandbox`:
+
+- `containers/sandbox/flake.nix` defines a pinned `ttyProfile` (`pkgs.buildEnv`
+  of the bare-minimum TTY toolset: zsh, tmux, nvim, yazi, starship, fzf,
+  zoxide, bat, eza, git, ripgrep, fd, openssh).
+- The Dockerfile builds that profile inside a `nixos/nix` build stage and
+  copies the store + profile into the final image, so sandbox pods start with
+  the toolset pre-baked (no per-pod install).
+- Minimal rc files (`zshrc`, `tmux.conf`, `starship.toml`) are baked in so the
+  sandbox shell feels like a real tty-engineer workstation.
+
 ### 3.2 `cmd/helpers.go`
 
 - `buildCustomImages` (helpers.go:201) now builds both images: it warns and
   skips `terminal` if `containers/terminal` is absent (backwards-compatible
   with orgs that predate the terminal).
 - `loadCustomImages` (helpers.go:235) loads `["backstage-platform:latest",
-  "terminal:latest"]` into the Kind cluster via `kind load docker-image`.
+  "terminal:latest", "sandbox-tty:latest"]` into the Kind cluster via
+  `kind load docker-image`.
 
 This is why, after a fresh `unimart open`, `docker exec localdev-control-plane
 crictl images` shows `docker.io/library/terminal` — the image is present in the
@@ -156,8 +170,10 @@ scaffolder produces.
 `packages/nix-sandboxes/sandboxes/example/deployment.yaml`:
 
 - `Deployment example-sandbox` in namespace `sandboxes`.
-- One container, `nix`, running `nixos/nix:latest` with
-  `imagePullPolicy: IfNotPresent`.
+- One container, `nix`, running `docker.io/library/sandbox-tty:latest` with
+  `imagePullPolicy: IfNotPresent`. The image is built from `containers/sandbox`
+  during `unimart open`/`reload` and carries the bare-minimum TTY toolset
+  (zsh, tmux, nvim, yazi, starship, fzf, zoxide, bat, eza, git).
 - Command keeps the pod alive: `echo "Nix sandbox 'example' ready"; sleep
   infinity`.
 - Resource requests/limits: `100m/256Mi` request, `1 CPU/1Gi` limit.
@@ -177,6 +193,8 @@ access point.
   - `SANDBOX_NAME=example-sandbox` → tells the entrypoint which Deployment to
     exec into.
   - `SANDBOX_CONTAINER=nix` → which container carries the shell.
+  - `SHELL_CMD=/bin/zsh` → the interactive shell launched by ttyd (the baked
+    profile's zsh), so the browser terminal is a proper TTY environment.
 - Command `["/terminal-entrypoint.sh"]`.
 - Exposes container port `7681` (ttyd's listen port).
 - Carries the label `backstage.io/kubernetes-id: example-sandbox`, which ties
@@ -410,7 +428,8 @@ root clean.
 | Concern | File |
 |---------|------|
 | Terminal image | `containers/terminal/Dockerfile`, `terminal-entrypoint.sh` |
-| Image build (CLI) | `internal/builder/builder.go` (`BuildTerminal`) |
+| Sandbox runtime image | `containers/sandbox/Dockerfile`, `flake.nix`, `flake.lock`, `rc/` |
+| Image build (CLI) | `internal/builder/builder.go` (`BuildTerminal`, `BuildSandbox`) |
 | Image build/load orchestration | `cmd/helpers.go` (`buildCustomImages`, `loadCustomImages`) |
 | Running example sandbox | `packages/nix-sandboxes/sandboxes/example/*.yaml` |
 | ArgoCD app for sandboxes | `packages/nix-sandboxes.yaml` |

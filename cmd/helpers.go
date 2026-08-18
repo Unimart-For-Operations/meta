@@ -223,6 +223,14 @@ func buildCustomImages(stepLabel, orgDir string) error {
 		return fmt.Errorf("terminal build failed: %w", err)
 	}
 
+	// Build sandbox-tty image
+	sandboxDir := filepath.Join(orgDir, "containers", "sandbox")
+	if _, err := os.Stat(sandboxDir); err != nil {
+		fmt.Printf("  %s sandbox-tty not found, skipping\n", warn("[warn]"))
+	} else if err := builder.BuildSandbox(orgDir, verbose); err != nil {
+		return fmt.Errorf("sandbox-tty build failed: %w", err)
+	}
+
 	fmt.Printf("  %s all custom images built\n", pass("[ok]"))
 	return nil
 }
@@ -232,7 +240,7 @@ func buildCustomImages(stepLabel, orgDir string) error {
 func loadCustomImages(stepLabel string) error {
 	fmt.Printf("\n%s Loading custom images into Kind\n\n", bold(stepLabel))
 
-	images := []string{"backstage-platform:latest", "terminal:latest"}
+	images := []string{"backstage-platform:latest", "terminal:latest", "sandbox-tty:latest"}
 
 	for _, img := range images {
 		// Check if image exists locally
