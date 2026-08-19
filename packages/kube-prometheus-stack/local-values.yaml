@@ -1,0 +1,48 @@
+# Local-dev overrides for the kube-prometheus-stack chart.
+# Keeps the full monitoring stack but pins modest resource requests so it
+# runs comfortably on the single-node IDP Kind cluster.
+
+# The chart's CRDs are bundled as binary data (charts/crds/files/crds.bz2) and
+# applied by a pre-install/pre-upgrade hook Job. Enable it so ArgoCD installs
+# the CRDs (rendered as a PreSync hook) before the operator comes up.
+crds:
+  upgradeJob:
+    enabled: true
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 96Mi
+
+prometheus:
+  prometheusSpec:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+
+grafana:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
