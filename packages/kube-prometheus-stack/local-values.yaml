@@ -32,6 +32,11 @@ prometheus:
         memory: 512Mi
 
 grafana:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.cnoe.localtest.me
   resources:
     requests:
       cpu: 100m
