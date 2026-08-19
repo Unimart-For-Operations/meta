@@ -20,9 +20,10 @@ var reloadCmd = &cobra.Command{
 	Short: "Reconcile platform changes without tearing down the cluster",
 	Long: `Push local changes into a running cluster — no teardown required.
 
-Performs a 2-step reconcile sequence:
+Performs a 3-step reconcile sequence:
   1. Re-run idpbuilder create (idempotent — reconciles packages + ArgoCD apps)
   2. Re-publish all org repos to in-cluster Gitea (push updated branches)
+  3. Back up platform repos to GitHub (3-way mirror)
 
 Use this after editing CI workflows, ArgoCD Application YAMLs, or any repo
 contents that should be reflected in the running platform without a full
@@ -87,6 +88,9 @@ func runReload(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+
+	// Step 3: Back up platform repos to GitHub (3-way mirror)
+	syncPlatformMirror(orgDir)
 
 	fmt.Println()
 	fmt.Printf("%s platform reloaded\n", pass("done"))

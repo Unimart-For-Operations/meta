@@ -44,3 +44,6 @@ containers/sandbox/hm/
 
 # idpbuilder runtime artifacts (Gitea workflows written into the tree)
 idpbuilder/.gitea/
+
+# Pull-only clones of platform-generated repos (populated by scripts/mirror-platform-repos.sh)
+mirrors/

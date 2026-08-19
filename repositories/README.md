@@ -18,6 +18,10 @@ Each entry is a symlink to the corresponding submodule directory at the org root
 Symlinks are used to avoid duplicate clones — the submodule directories at the org root
 are the canonical local copies. `unimart` resolves symlinks when scanning for `.git` entries.
 
+> Platform-generated repos (`idpbuilder-localdev-*`) are **not** part of this directory.
+> They live in `../mirrors/` as pull-only clones (see `scripts/mirror-platform-repos.sh`).
+> `repositories/` is a publish source for Gitea; `mirrors/` is a backup sink only.
+
 ## Usage
 
 ```bash

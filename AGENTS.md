@@ -178,10 +178,13 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 │       ├── theme.go                     LoadFromOrg(), GenerateK9sSkin(), GenerateTmuxStatus()
 │       └── fixtures/theme-sample.json  Test fixture
 ├── scripts/setup.sh                     make init bootstrap script (7 steps)
+├── scripts/mirror-platform-repos.sh    3-way mirror sync (Gitea→mirrors→GitHub)
 ├── Makefile                             HAS_UNIMART delegation + shell fallbacks
 ├── packages/                            Custom ArgoCD Application YAMLs (passed to idpbuilder -p)
 ├── containers/                          Test infrastructure
 ├── repositories/                        Publish-to-Gitea symlink directory
+├── mirrors/                             Pull-only clones of the 6 platform-generated
+│                                       repos (backup sink; sync via scripts/mirror-platform-repos.sh)
 ├── cmdr/                                Nix workstation config (submodule)
 ├── docs-service/                        Phoenix docs microservice (submodule pending; see repositories/)
 ├── unimart-employee-handbooks/cdc/      Obsidian vault / synced doc mirrors (submodule)

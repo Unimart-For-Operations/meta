@@ -29,14 +29,15 @@ var openCmd = &cobra.Command{
 	Short: "Open for business — bring the full IDP platform online",
 	Long: `One command to bring the entire org's IDP online locally.
 
-Performs a 7-step startup sequence:
+Performs an 8-step startup sequence:
   1. Check prerequisites (Go, Docker, Kind, kubectl)
   2. Start container runtime (Colima on macOS)
   3. Build custom images (backstage-platform)
   4. Create IDP platform (ArgoCD + Gitea + nginx on Kind, in-process)
   5. Load custom images into Kind
   6. Publish all org repos to in-cluster Gitea
-  7. Open browser
+  7. Back up platform repos to GitHub (3-way mirror)
+  8. Open browser
 
 Opinionated defaults: dev password enabled, exit-after-sync mode,
 all org repos published to Gitea via HTTPS.
@@ -58,23 +59,23 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 1: Check prerequisites
-	fmt.Printf("%s Checking prerequisites\n\n", bold("[1/7]"))
+	fmt.Printf("%s Checking prerequisites\n\n", bold("[1/8]"))
 	if err := checkPlatformPrereqs(); err != nil {
 		return err
 	}
 
 	// Step 2: Ensure Docker daemon is reachable
-	if err := ensureDocker("[2/7]", nil); err != nil {
+	if err := ensureDocker("[2/8]", nil); err != nil {
 		return err
 	}
 
 	// Step 3: Build custom images
-	if err := buildCustomImages("[3/7]", orgDir); err != nil {
+	if err := buildCustomImages("[3/8]", orgDir); err != nil {
 		return err
 	}
 
 	// Step 4: Create IDP platform with opinionated defaults
-	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[4/7]"))
+	fmt.Printf("\n%s Creating IDP platform\n\n", bold("[4/8]"))
 
 	// Resolve packages dir (may not exist yet — that's fine, idpbuilder handles it)
 	packagesDir := filepath.Join(orgDir, "packages")
@@ -86,12 +87,12 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  %s IDP platform running\n", pass("[ok]"))
 
 	// Step 5: Load custom images into Kind
-	if err := loadCustomImages("[5/7]"); err != nil {
+	if err := loadCustomImages("[5/8]"); err != nil {
 		return err
 	}
 
 	// Step 6: Publish all org repos to in-cluster Gitea
-	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[6/7]"))
+	fmt.Printf("\n%s Publishing org repos to in-cluster Gitea\n\n", bold("[6/8]"))
 
 	token, err := cluster.GetGiteaAdminToken(defaultGiteaURL)
 	if err != nil {
@@ -114,7 +115,10 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Open browser
+	// Step 7: Back up platform repos to GitHub (3-way mirror)
+	syncPlatformMirror(orgDir)
+
+	// Step 8: Open browser
 	fmt.Println()
 	if openNoBrowser {
 		fmt.Println("  Skipping browser (--no-browser)")

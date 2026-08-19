@@ -263,3 +263,27 @@ func loadCustomImages(stepLabel string) error {
 	fmt.Printf("  %s all custom images loaded\n", pass("[ok]"))
 	return nil
 }
+
+// syncPlatformMirror backs up the 6 idpbuilder-localdev-* repos from Gitea
+// to the mirrors/ directory and the org's GitHub backup repos. Platform
+// repos are regenerated on every open/reload, so sync after each run keeps
+// the durable GitHub + local copies fresh. Warns instead of failing so a
+// backup hiccup never breaks the primary open/reload flow.
+func syncPlatformMirror(orgDir string) {
+	fmt.Printf("\n%s Syncing platform repos to GitHub backup (3-way mirror)\n\n", bold(""))
+	script := filepath.Join(orgDir, "scripts", "mirror-platform-repos.sh")
+	if _, err := os.Stat(script); err != nil {
+		fmt.Printf("  %s no %s — skipping mirror sync\n", warn("[warn]"), script)
+		return
+	}
+
+	cmd := exec.Command(script)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("  %s mirror sync failed: %v\n", warn("[warn]"), err)
+		fmt.Println("  Run manually: scripts/mirror-platform-repos.sh")
+		return
+	}
+	fmt.Printf("  %s platform repos backed up to GitHub\n", pass("[ok]"))
+}
