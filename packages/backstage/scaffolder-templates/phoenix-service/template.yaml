@@ -80,6 +80,7 @@ spec:
             allowedHosts:
               - my-gitea-http.gitea.svc.cluster.local:3000
             allowedOwners:
+              - Unimart-For-Operations
               - giteaAdmin
 
   steps:

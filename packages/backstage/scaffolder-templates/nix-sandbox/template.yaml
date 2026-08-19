@@ -68,7 +68,7 @@ spec:
           title: Nix Sandboxes Repository
           type: string
           description: The shared repository where sandbox manifests are appended
-          default: my-gitea-http.gitea.svc.cluster.local:3000?owner=giteaAdmin&repo=idpbuilder-localdev-nix-sandboxes-nix-sandboxes
+          default: my-gitea-http.gitea.svc.cluster.local:3000?owner=Unimart-For-Operations&repo=idpbuilder-localdev-nix-sandboxes-nix-sandboxes
           ui:help: 'Leave as-is. This is the Gitea repo created by idpbuilder from cnoe://nix-sandboxes.'
 
   steps:
