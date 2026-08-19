@@ -30,6 +30,7 @@ const (
 	ingressHostUsage    = "Host name used by ingresses. Useful when you have another proxy in front of ingress-nginx that idpbuilder provisions."
 	protocolUsage       = "Protocol to use to access web UIs. http or https."
 	portUsage           = "Port number to use to access web UIs."
+	organizationUsage   = "Gitea organization (or owner) under which platform-generated repositories are created. Defaults to giteaAdmin."
 	pathRoutingUsage    = "When set to true, web UIs are exposed under single domain name. " +
 		"e.g. \"https://cnoe.localtest.me/argocd\" instead of \"https://argocd.cnoe.localtest.me\""
 	extraPackagesUsage             = "Paths to locations containing custom packages"
@@ -55,6 +56,7 @@ var (
 	ingressHost               string
 	port                      string
 	pathRouting               bool
+	organization              string
 )
 
 var CreateCmd = &cobra.Command{
@@ -88,6 +90,7 @@ func init() {
 	CreateCmd.Flags().StringSliceVarP(&extraPackages, "package", "p", []string{}, extraPackagesUsage)
 	CreateCmd.Flags().StringSliceVarP(&packageCustomizationFiles, "package-custom-file", "c", []string{}, packageCustomizationFilesUsage)
 	// idpbuilder related flags
+	CreateCmd.PersistentFlags().StringVar(&organization, "organization", "", organizationUsage)
 	CreateCmd.Flags().BoolVarP(&noExit, "no-exit", "n", true, noExitUsage)
 }
 
@@ -158,12 +161,13 @@ func create(cmd *cobra.Command, args []string) error {
 		RegistryConfig:    maybeRegistryConfig,
 
 		TemplateData: v1alpha1.BuildCustomizationSpec{
-			Protocol:       protocol,
-			Host:           host,
-			IngressHost:    ingressHost,
-			Port:           port,
-			UsePathRouting: pathRouting,
-			StaticPassword: devPassword,
+			Protocol:         protocol,
+			Host:             host,
+			IngressHost:      ingressHost,
+			Port:             port,
+			UsePathRouting:   pathRouting,
+			StaticPassword:   devPassword,
+			OrganizationName: organization,
 		},
 
 		CustomPackageFiles:   localFiles,

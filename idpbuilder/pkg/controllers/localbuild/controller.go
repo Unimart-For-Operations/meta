@@ -691,7 +691,7 @@ func (r *LocalbuildReconciler) reconcileGitRepo(ctx context.Context, resource *v
 				Name:             v1alpha1.GitProviderGitea,
 				GitURL:           resource.Status.Gitea.ExternalURL,
 				InternalGitURL:   resource.Status.Gitea.InternalURL,
-				OrganizationName: v1alpha1.GiteaAdminUserName,
+				OrganizationName: r.Config.GetOrganizationName(),
 			},
 			SecretRef: v1alpha1.SecretReference{
 				Name:      resource.Status.Gitea.AdminUserSecretName,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cnoe-io/idpbuilder/pkg/util/files"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -33,14 +34,39 @@ type giteaProvider struct {
 }
 
 func (g *giteaProvider) createRepository(ctx context.Context, repo *v1alpha1.GitRepository) (repoInfo, error) {
-	resp, _, err := g.giteaClient.CreateRepo(gitea.CreateRepoOption{
+	opt := gitea.CreateRepoOption{
 		Name:        getRepositoryName(*repo),
 		Description: fmt.Sprintf("created by Git Repository controller for %s in %s namespace", repo.Name, repo.Namespace),
 		// we should reconsider this when targeting non-local clusters.
 		Private:       false,
 		DefaultBranch: DefaultBranchName,
 		AutoInit:      true,
-	})
+	}
+
+	var (
+		resp     *gitea.Repository
+		err      error
+		orgName  = getOrganizationName(*repo)
+		httpResp *gitea.Response
+	)
+	if orgName != "" && orgName != v1alpha1.GiteaAdminUserName {
+		// Ensure the target org exists before creating a repository inside it.
+		_, httpResp, err = g.giteaClient.GetOrg(orgName)
+		if err != nil {
+			if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+				if _, _, orgErr := g.giteaClient.CreateOrg(gitea.CreateOrgOption{
+					Name: orgName,
+				}); orgErr != nil {
+					return repoInfo{}, fmt.Errorf("creating gitea org %s: %w", orgName, orgErr)
+				}
+			} else {
+				return repoInfo{}, fmt.Errorf("checking gitea org %s: %w", orgName, err)
+			}
+		}
+		resp, _, err = g.giteaClient.CreateOrgRepo(orgName, opt)
+	} else {
+		resp, _, err = g.giteaClient.CreateRepo(opt)
+	}
 
 	if err != nil {
 		return repoInfo{}, fmt.Errorf("failed to create git repository: %w", err)
@@ -96,7 +122,7 @@ func (g *giteaProvider) getRepository(ctx context.Context, repo *v1alpha1.GitRep
 		name:                     resp.Name,
 		fullName:                 resp.FullName,
 		cloneUrl:                 resp.CloneURL,
-		internalGitRepositoryUrl: getInternalGiteaRepositoryURL(repo.Namespace, repo.Name, repo.Spec.Provider.InternalGitURL),
+		internalGitRepositoryUrl: getInternalGiteaRepositoryURL(repo.Namespace, repo.Name, repo.Spec.Provider.InternalGitURL, getOrganizationName(*repo)),
 	}, nil
 }
 
@@ -159,6 +185,9 @@ func NewGiteaClient(url string, options ...gitea.ClientOption) (GiteaClient, err
 	return gitea.NewClient(url, options...)
 }
 
-func getInternalGiteaRepositoryURL(namespace, name, baseUrl string) string {
-	return fmt.Sprintf("%s/%s/%s-%s.git", baseUrl, v1alpha1.GiteaAdminUserName, namespace, name)
+func getInternalGiteaRepositoryURL(namespace, name, baseUrl, orgName string) string {
+	if orgName == "" {
+		orgName = v1alpha1.GiteaAdminUserName
+	}
+	return fmt.Sprintf("%s/%s/%s-%s.git", baseUrl, orgName, namespace, name)
 }

@@ -57,6 +57,7 @@ func RunControllers(
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("custompackage-controller"),
+		Config:   cfg,
 		TempDir:  tmpDir,
 		RepoMap:  repoMap,
 	}).SetupWithManager(mgr)

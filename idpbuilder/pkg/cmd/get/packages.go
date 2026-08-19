@@ -81,7 +81,7 @@ func printPackages(ctx context.Context, outWriter io.Writer, kubeClient client.C
 		newPackage.ArgocdRepository = argocdBaseUrl + "/applications/" + cp.Spec.ArgoCD.Namespace + "/" + cp.Spec.ArgoCD.Name
 		// There is a GitRepositoryRefs when the project has been cloned to the internal git repository
 		if cp.Status.GitRepositoryRefs != nil {
-			newPackage.GitRepository = cp.Spec.InternalGitServeURL + "/" + v1alpha1.GiteaAdminUserName + "/" + idpbuilderNamespace + "-" + cp.Status.GitRepositoryRefs[0].Name
+			newPackage.GitRepository = cp.Spec.InternalGitServeURL + "/" + config.GetOrganizationName() + "/" + idpbuilderNamespace + "-" + cp.Status.GitRepositoryRefs[0].Name
 		} else {
 			// Default branch reference
 			ref := "main"

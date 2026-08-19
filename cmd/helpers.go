@@ -136,6 +136,7 @@ type createOptions struct {
 	kindConfig     string
 	ingressHost    string
 	recreate       bool
+	organization   string
 }
 
 // addCreateFlags registers the curated idpbuilder create flags onto cmd.
@@ -149,6 +150,7 @@ func addCreateFlags(cmd *cobra.Command, o *createOptions) {
 	cmd.Flags().StringVar(&o.kindConfig, "kind-config", "", "Path or URL to a kind config file")
 	cmd.Flags().StringVar(&o.ingressHost, "ingress-host-name", "", "Host name used by ingresses")
 	cmd.Flags().BoolVar(&o.recreate, "recreate", false, "Delete the cluster first if it already exists")
+	cmd.Flags().StringVar(&o.organization, "organization", defaultOwner, "Gitea organization under which platform repos are created")
 }
 
 // idpCreateArgs builds the idpbuilder create argument list for open/reload.
@@ -180,6 +182,9 @@ func idpCreateArgs(packagesDir string, o createOptions, extraArgs []string) []st
 	}
 	if o.ingressHost != "" {
 		args = append(args, "--ingress-host-name="+o.ingressHost)
+	}
+	if o.organization != "" {
+		args = append(args, "--organization="+o.organization)
 	}
 	if o.recreate {
 		args = append(args, "--recreate")

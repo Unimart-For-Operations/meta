@@ -62,6 +62,18 @@ type BuildCustomizationSpec struct {
 	UsePathRouting bool   `json:"usePathRouting,omitempty"`
 	SelfSignedCert string `json:"selfSignedCert,omitempty"`
 	StaticPassword bool   `json:"staticPassword,omitempty"`
+	// OrganizationName is the Gitea organization (or owner) under which
+	// platform-generated repositories are created. Defaults to giteaAdmin.
+	OrganizationName string `json:"organizationName,omitempty"`
+}
+
+// GetOrganizationName returns the configured Gitea organization for
+// platform-generated repositories, falling back to the admin user when unset.
+func (b BuildCustomizationSpec) GetOrganizationName() string {
+	if b.OrganizationName == "" {
+		return GiteaAdminUserName
+	}
+	return b.OrganizationName
 }
 
 type LocalbuildSpec struct {

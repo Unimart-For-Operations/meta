@@ -17,6 +17,7 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
@@ -138,7 +139,7 @@ func CloneRemoteRepoToMemory(ctx context.Context, remote v1alpha1.RemoteReposito
 	return wt, cloned, nil
 }
 
-func CloneRemoteRepoToDir(ctx context.Context, remote v1alpha1.RemoteRepositorySpec, depth int, insecureSkipTLS bool, dir, fallbackUrl string) (billy.Filesystem, *git.Repository, error) {
+func CloneRemoteRepoToDir(ctx context.Context, remote v1alpha1.RemoteRepositorySpec, depth int, insecureSkipTLS bool, dir, fallbackUrl string, auth ...transport.AuthMethod) (billy.Filesystem, *git.Repository, error) {
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
 		if errors.Is(err, git.ErrRepositoryNotExists) {
@@ -148,6 +149,9 @@ func CloneRemoteRepoToDir(ctx context.Context, remote v1alpha1.RemoteRepositoryS
 				ShallowSubmodules: true,
 				Tags:              git.AllTags,
 				InsecureSkipTLS:   insecureSkipTLS,
+			}
+			if len(auth) > 0 && auth[0] != nil {
+				cloneOptions.Auth = auth[0]
 			}
 			if remote.CloneSubmodules {
 				cloneOptions.RecurseSubmodules = git.DefaultSubmoduleRecursionDepth

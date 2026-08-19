@@ -518,7 +518,7 @@ func (r *Reconciler) reconcileArgoCDSourceFromRemote(ctx context.Context, resour
 				Name:             v1alpha1.GitProviderGitea,
 				GitURL:           resource.Spec.GitServerURL,
 				InternalGitURL:   resource.Spec.InternalGitServeURL,
-				OrganizationName: v1alpha1.GiteaAdminUserName,
+				OrganizationName: r.Config.GetOrganizationName(),
 			},
 			SecretRef: resource.Spec.GitServerAuthSecretRef,
 		}
@@ -594,7 +594,7 @@ func (r *Reconciler) reconcileArgoCDSourceFromLocal(ctx context.Context, resourc
 				Name:             v1alpha1.GitProviderGitea,
 				GitURL:           resource.Spec.GitServerURL,
 				InternalGitURL:   resource.Spec.InternalGitServeURL,
-				OrganizationName: v1alpha1.GiteaAdminUserName,
+				OrganizationName: r.Config.GetOrganizationName(),
 			},
 			SecretRef: resource.Spec.GitServerAuthSecretRef,
 		}

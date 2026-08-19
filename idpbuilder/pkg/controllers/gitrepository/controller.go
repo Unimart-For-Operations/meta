@@ -249,7 +249,11 @@ func reconcileLocalRepoContent(ctx context.Context, repo *v1alpha1.GitRepository
 		Ref:             "",
 	}
 	logger.V(1).Info("cloning repo", "repoUrl", tgtRepoSpec.Url, "fallbackUrl", getFallbackRepositoryURL(repo, tgtRepo), "cloneDir", tgtCloneDir)
-	_, tgtRepository, err := util.CloneRemoteRepoToDir(ctx, tgtRepoSpec, 1, true, tgtCloneDir, getFallbackRepositoryURL(repo, tgtRepo))
+	auth, authErr := getBasicAuth(creds)
+	if authErr != nil {
+		return fmt.Errorf("getting basic auth: %w", authErr)
+	}
+	_, tgtRepository, err := util.CloneRemoteRepoToDir(ctx, tgtRepoSpec, 1, true, tgtCloneDir, getFallbackRepositoryURL(repo, tgtRepo), &auth)
 	if err != nil {
 		return fmt.Errorf("cloning repo %s: %w", tgtRepoSpec.Url, err)
 	}
@@ -314,7 +318,11 @@ func reconcileRemoteRepoContent(ctx context.Context, repo *v1alpha1.GitRepositor
 	defer lst.MU.Unlock()
 
 	logger.V(1).Info("cloning repo", "repoUrl", tgtRepoSpec.Url, "fallbackUrl", getFallbackRepositoryURL(repo, tgtRepo), "cloneDir", tgtCloneDir)
-	tgtRepoWT, tgtRepository, err := util.CloneRemoteRepoToDir(ctx, tgtRepoSpec, 1, true, tgtCloneDir, getFallbackRepositoryURL(repo, tgtRepo))
+	auth, authErr := getBasicAuth(creds)
+	if authErr != nil {
+		return fmt.Errorf("getting basic auth: %w", authErr)
+	}
+	tgtRepoWT, tgtRepository, err := util.CloneRemoteRepoToDir(ctx, tgtRepoSpec, 1, true, tgtCloneDir, getFallbackRepositoryURL(repo, tgtRepo), &auth)
 	if err != nil {
 		return fmt.Errorf("cloning repo %s: %w", srcRepo.Url, err)
 	}
