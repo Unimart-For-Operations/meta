@@ -2,12 +2,14 @@
 # Keeps the full monitoring stack but pins modest resource requests so it
 # runs comfortably on the single-node IDP Kind cluster.
 
-# The chart's CRDs are bundled as binary data (charts/crds/files/crds.bz2) and
-# applied by a pre-install/pre-upgrade hook Job. Enable it so ArgoCD installs
-# the CRDs (rendered as a PreSync hook) before the operator comes up.
+# CRDs are NOT applied via the upgradeJob hook: the hook bundles the CRDs as
+# a binary ConfigMap (crds.bz2) whose full manifest exceeds ArgoCD's 262KB
+# annotation limit, so every sync fails at the PreSync step. Instead the
+# ArgoCD Application sets helm.includeCrds: true so the CRD files render as
+# plain manifests in the sync.
 crds:
   upgradeJob:
-    enabled: true
+    enabled: false
 
 prometheusOperator:
   resources:
