@@ -1,31 +1,55 @@
+# Stage 1: Build the Home Manager activation package from cmdr modules.
+#
+# The flake imports cmdr's tty + tui graduated modules plus cherry-picked
+# CLI modules (atuin, direnv, fonts, opencode).  The activation package
+# contains every binary, config file, and shell integration that
+# home-manager would install on a real workstation.
 FROM nixos/nix:latest AS build
-COPY flake.nix flake.lock /sandbox/
-WORKDIR /sandbox
-RUN rm -f /root/.nix-profile \
-    && nix --extra-experimental-features 'nix-command flakes' build .#ttyProfile --no-write-lock-file --out-link /root/.nix-profile
 
+# Enable flakes globally for the build
+RUN echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf
+
+# Copy the flake and cmdr modules into a single flake root.
+# The flake references ./cmdr-home so everything stays in-tree.
+COPY containers/sandbox/flake.nix /build/flake.nix
+COPY cmdr/home /build/cmdr-home
+
+WORKDIR /build
+
+# Build the activation package.
+RUN nix build .#activationPackage \
+      --no-write-lock-file \
+      --out-link /root/.hm-activation \
+    && echo "activation package built"
+
+# Stage 2: Activate into a clean image.
 FROM nixos/nix:latest
+
+# Pull the Nix store from the build stage (contains all closures)
 COPY --from=build /nix /nix
-RUN rm -rf /root/.nix-profile
-COPY --from=build /root/.nix-profile /root/.nix-profile
 
+# Copy the activation package symlink
+COPY --from=build /root/.hm-activation /root/.hm-activation
+
+# Run the activation script — this populates /root with dotfiles,
+# shell configs, nvim configs, tmux configs, etc.
+# HOME must be set for home-manager activation to target the right dir.
+#
+# The nixos/nix base image ships a default user profile with packages
+# (man-db, gzip, etc.) that conflict with home-manager-path.  Nuke the
+# user profile entirely but keep /nix/var/nix/profiles/default (which
+# contains nix-build, nix-env, etc.) on PATH so activation can run.
+ENV HOME=/root
+ENV PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUN rm -f /root/.nix-profile \
+    && nix-env --uninstall '.*' 2>/dev/null || true
+RUN /root/.hm-activation/activate
+
+# Ensure zsh is findable as a login shell
+RUN ln -sf "$(readlink -f /root/.nix-profile/bin/zsh 2>/dev/null || echo /nix/var/nix/profiles/per-user/root/profile/bin/zsh)" /bin/zsh 2>/dev/null; \
+    [ -x /bin/zsh ] || ln -sf "$(find /nix/store -name zsh -type f -executable 2>/dev/null | head -1)" /bin/zsh
+
+ENV SHELL=/bin/zsh
 ENV PATH=/root/.nix-profile/bin:/root/.local/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ENV SHELL=/root/.nix-profile/bin/zsh
-
-RUN ln -sf /root/.nix-profile/bin/zsh /bin/zsh \
-    && mkdir -p /root/.config /root/.config/tmux /root/.config/opencode /root/.local/bin
-
-COPY rc/zshrc /root/.zshrc
-COPY rc/tmux.conf /root/.config/tmux/tmux.conf
-COPY rc/starship.toml /root/.config/starship.toml
-COPY rc/opencode/opencode.json /root/.config/opencode/opencode.json
-
-RUN printf 'source-file ~/.config/tmux/tmux.conf\n' > /root/.tmux.conf
-
-COPY hm/nvim-astro /root/.config/nvim-astro
-
-RUN printf '#!/usr/bin/env bash\nexec env NVIM_APPNAME=nvim-astro /root/.nix-profile/bin/nvim "$@"\n' > /root/.local/bin/nvim-astro \
-    && printf '#!/usr/bin/env bash\nexec "$(dirname "$0")/nvim-astro" "$@"\n' > /root/.local/bin/nvim \
-    && chmod +x /root/.local/bin/nvim /root/.local/bin/nvim-astro
 
 CMD ["sleep", "infinity"]
