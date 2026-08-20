@@ -32,6 +32,7 @@ prometheus:
         memory: 512Mi
 
 grafana:
+  adminPassword: grafana1234
   ingress:
     enabled: true
     ingressClassName: nginx
