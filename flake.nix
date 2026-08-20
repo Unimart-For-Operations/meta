@@ -30,7 +30,7 @@
             pname = "unimart";
             version = version;
             src = ./.;
-            vendorHash = "sha256-WpPyHmBX3uxIHZ5JkzOFY5ZMumZutkcI1a3GmvLL1+k=";
+            vendorHash = "sha256-uIQJbJpSbA5q2a/JIWIntIadolMbTb5vlfAlWgKITy8=";
 
             # Build only the root package. The nested idpbuilder module
             # (./idpbuilder) is imported via replace => ./idpbuilder and is
