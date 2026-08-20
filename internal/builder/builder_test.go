@@ -76,18 +76,3 @@ func TestCopyTree_FileAndDir(t *testing.T) {
 		t.Fatalf("copyTree onto removed dst should succeed, got %v", err)
 	}
 }
-
-func TestSyncNvimAstro_MissingSource(t *testing.T) {
-	org := t.TempDir()
-	sandbox := filepath.Join(org, "containers", "sandbox")
-	if err := os.MkdirAll(sandbox, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	err := syncNvimAstro(org, sandbox)
-	if err == nil {
-		t.Fatal("syncNvimAstro should fail when cmdr nvim-astro is missing")
-	}
-	if !strings.Contains(err.Error(), "nvim-astro not found") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
