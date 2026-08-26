@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: personal-blog
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: personal-blog
+    app.kubernetes.io/instance: personal-blog
+spec:
+  project: default
+  source:
+    repoURL: http://my-gitea-http.gitea.svc.cluster.local:3000/Unimart-For-Operations/personal-blog.git
+    targetRevision: main
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

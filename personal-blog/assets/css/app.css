@@ -1,0 +1,33 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer components {
+  .prose {
+    @apply text-slate-900 dark:text-slate-100;
+  }
+
+  .prose h1 {
+    @apply text-4xl font-bold mb-6 mt-8;
+  }
+
+  .prose h2 {
+    @apply text-3xl font-bold mb-4 mt-6;
+  }
+
+  .prose h3 {
+    @apply text-2xl font-bold mb-3 mt-5;
+  }
+
+  .prose a {
+    @apply text-blue-600 dark:text-blue-400 hover:underline;
+  }
+
+  .prose code {
+    @apply bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono text-sm;
+  }
+
+  .prose pre {
+    @apply bg-slate-800 text-slate-100 p-4 rounded overflow-x-auto;
+  }
+}

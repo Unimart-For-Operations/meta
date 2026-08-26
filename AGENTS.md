@@ -66,7 +66,9 @@ unimart is distributed through three channels:
 
 ### Nix distribution details
 
-The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's flake references it as a flake input (`meta.url = "github:Unimart-For-Operations/meta"`). The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
+The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's flake references it as a flake input (`meta.url = "git+ssh://git@github.com/Unimart-For-Operations/meta.git"` — uses git+ssh:// for private repos, not github: which would require a token). The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
+
+**Note on cli sub-features:** The `cli` feature is a convenience bundle that imports `cli-core`, `cli-languages`, `cli-containers`, `cli-devops`, and `cli-org`. The `_template/meta.nix` documents these sub-features, but they are not registered in the feature engine's `featureModules` map — only the bundle `cli` is usable as a top-level feature. To use individual components, compose them manually or use the bundle.
 
 **Version pinning**: cmdr's `flake.lock` pins the meta commit. To bump: push meta changes, then run `nix flake update meta` in cmdr + `make switch`.
 
@@ -196,7 +198,13 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 
 ## Working in This Directory
 
-This is the org coordination hub. Every component repo is a git submodule with its own `AGENTS.md`. When working across repos, read the target repo's `AGENTS.md` first — it has repo-specific architecture, build/test commands, and conventions.
+This is the org coordination hub. Component repos are managed as follows:
+
+- **Submodules** (`cmdr`, `unimart-employee-handbooks/cdc`): Git submodules with `ignore = dirty` where applicable. Each has its own `AGENTS.md`.
+- **Tracked directories** (`idpbuilder`): Absorbed in-tree, not submodules. Has its own `AGENTS.md`.
+- **Standalone** (`docs-service`): Tracked directory, pending submodule conversion. Has its own `AGENTS.md`.
+
+When working across repos, read the target repo's `AGENTS.md` first — it has repo-specific architecture, build/test commands, and conventions.
 
 | Entry Point | Read This First | Then This |
 |-------------|----------------|-----------|

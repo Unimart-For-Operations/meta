@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: personal-blog-config
+  namespace: default
+  labels:
+    app: personal-blog
+data:
+  phx_host: personal-blog.cnoe.localtest.me
+  gitea_url: http://my-gitea-http.gitea.svc.cluster.local:3000
+  gitea_user: ""
+  cache_ttl: "60"

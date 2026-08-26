@@ -255,6 +255,30 @@ backstage:
             lifecycle:
               timeToLive:
                 weeks: 4
+          # Built-in entity fact retrievers (shipped in the backend image,
+          # registered only when config exists for them). Daily cadence is
+          # ample for catalog-hygiene facts.
+          entityOwnershipFactRetriever:
+            cadence: '0 2 * * *'
+            initialDelay:
+              seconds: 45
+            lifecycle:
+              timeToLive:
+                weeks: 4
+          entityMetadataFactRetriever:
+            cadence: '0 2 * * *'
+            initialDelay:
+              seconds: 45
+            lifecycle:
+              timeToLive:
+                weeks: 4
+          techdocsFactRetriever:
+            cadence: '0 2 * * *'
+            initialDelay:
+              seconds: 45
+            lifecycle:
+              timeToLive:
+                weeks: 4
         factChecker:
           checks:
             k8sVersionSupported:
@@ -273,6 +297,92 @@ backstage:
                 message: The cluster runs a supported Kubernetes version.
               failureMetadata:
                 message: The cluster runs an unsupported Kubernetes version. Upgrade the cluster.
+
+            # --- Catalog hygiene quick wins (config-only, no rebuild) ---
+            entityHasOwner:
+              type: json-rules-engine
+              name: Has an owner
+              description: Every entity should declare a spec.owner.
+              factIds:
+                - entityOwnershipFactRetriever
+              rule:
+                conditions:
+                  all:
+                    - fact: hasOwner
+                      operator: equal
+                      value: true
+              successMetadata:
+                message: Entity has an owner.
+              failureMetadata:
+                message: Entity has no owner. Set spec.owner in catalog-info.yaml.
+
+            entityHasGroupOwner:
+              type: json-rules-engine
+              name: Owned by a group
+              description: Ownership should be a Group, not an individual user.
+              factIds:
+                - entityOwnershipFactRetriever
+              rule:
+                conditions:
+                  all:
+                    - fact: hasGroupOwner
+                      operator: equal
+                      value: true
+              successMetadata:
+                message: Entity is owned by a group.
+              failureMetadata:
+                message: Entity is not owned by a group. Prefer a Group over a user for spec.owner.
+
+            entityHasDescription:
+              type: json-rules-engine
+              name: Has a description
+              description: Every entity should have a metadata.description.
+              factIds:
+                - entityMetadataFactRetriever
+              rule:
+                conditions:
+                  all:
+                    - fact: hasDescription
+                      operator: equal
+                      value: true
+              successMetadata:
+                message: Entity has a description.
+              failureMetadata:
+                message: Entity has no description. Add metadata.description in catalog-info.yaml.
+
+            entityHasTags:
+              type: json-rules-engine
+              name: Has tags
+              description: Entities should carry at least one metadata.tag for discoverability.
+              factIds:
+                - entityMetadataFactRetriever
+              rule:
+                conditions:
+                  all:
+                    - fact: hasTags
+                      operator: equal
+                      value: true
+              successMetadata:
+                message: Entity has tags.
+              failureMetadata:
+                message: Entity has no tags. Add metadata.tags in catalog-info.yaml.
+
+            entityHasTechDocs:
+              type: json-rules-engine
+              name: Has TechDocs
+              description: Entities should reference TechDocs via backstage.io/techdocs-ref.
+              factIds:
+                - techdocsFactRetriever
+              rule:
+                conditions:
+                  all:
+                    - fact: hasAnnotationBackstageIoTechdocsRef
+                      operator: equal
+                      value: true
+              successMetadata:
+                message: Entity has a TechDocs reference.
+              failureMetadata:
+                message: Entity has no TechDocs reference. Add the backstage.io/techdocs-ref annotation.
 
 
   # ServiceAccount with Kubernetes RBAC

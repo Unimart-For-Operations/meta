@@ -1,0 +1,45 @@
+# The directory Mix will write its output to.
+/_build/
+
+# The directory containing user-specific local BEAM files (erl_crash.dump, etc).
+# Happens when Erlang angelfish stops abnormally (e.g. _build is symlinked).
+/.erlang.cookie
+
+# Generated files
+/cover/
+/doc/
+/priv/static/assets/
+/.phx_cldr_files/
+
+# Database
+/priv/repo/migrations/.migrations.exs
+
+# Temporary files
+*.beam
+*.swo
+*~
+.DS_Store
+*.swp
+.elixir_ls/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Environment
+.env
+.env.local
+
+# Nix
+.nix-mix/
+.nix-hex/
+result
+result-*
+
+# Dependencies
+deps/
+_build/
+
+# Node
+node_modules/

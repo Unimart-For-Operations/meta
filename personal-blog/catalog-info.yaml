@@ -1,0 +1,59 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: personal-blog
+  description: Personal portfolio, projects, and articles microservice
+  links:
+    - url: https://personal-blog.cnoe.localtest.me:8443
+      title: Personal Blog
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: user
+  system: idp-platform
+  providesApis:
+    - web
+  consumesApis: []
+  dependsOn:
+    - component:default/gitea
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: web
+  title: Personal Blog Web UI
+spec:
+  type: openapi
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Personal Blog API
+      version: 1.0.0
+    paths:
+      /:
+        get:
+          summary: Home page
+      /articles:
+        get:
+          summary: List articles
+      /portfolio:
+        get:
+          summary: List portfolio entries
+      /projects:
+        get:
+          summary: List projects
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: personal-blog
+  namespace: default
+spec:
+  selector:
+    app: personal-blog
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 4000
+    targetPort: 4000

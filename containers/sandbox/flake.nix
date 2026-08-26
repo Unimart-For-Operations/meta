@@ -81,15 +81,25 @@
             (cmdr + /04-modules/cli/graduated/opencode)
 
             # ── Container-specific overrides ───────────────────────
-            {
-              home = {
-                username = sandboxMeta.username;
-                homeDirectory = sandboxMeta.homeDirectory;
-              };
+            (
+              { lib, ... }:
+              {
+                home = {
+                  username = sandboxMeta.username;
+                  homeDirectory = sandboxMeta.homeDirectory;
+                };
 
-              # Suppress news — no interactive terminal during build
-              news.display = "silent";
-            }
+                # Suppress news — no interactive terminal during build
+                news.display = "silent";
+
+                # AstroNvim's lazy.nvim clones plugins over HTTPS from GitHub.
+                # The org-wide git module rewrites https://github.com/ ->
+                # git@github.com: (SSH), which fails in the sandbox — no SSH key
+                # is deployed and outbound SSH is typically blocked. Force an
+                # empty `url` section so lazy.nvim clones over HTTPS at runtime.
+                programs.git.settings.url = lib.mkForce { };
+              }
+            )
           ];
 
           extraSpecialArgs = {
