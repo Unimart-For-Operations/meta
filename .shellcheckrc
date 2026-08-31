@@ -1,0 +1,7 @@
+# ShellCheck configuration for meta repository
+#
+# Suppressed checks:
+# - SC1091: Not following sourced files (false positive for /etc/os-release, Nix profiles)
+# - SC2034: Unused variables (allowed for color definitions, future use)
+
+disable=SC1091,SC2034

@@ -177,7 +177,7 @@ if command -v go &>/dev/null; then
 	# Check PATH includes ~/.local/bin
 	case ":${PATH}:" in
 	*":${HOME}/.local/bin:"*) ;;
-	*) warn "~/.local/bin is not in PATH — add it to your shell profile" ;;
+	*) warn "${HOME}/.local/bin is not in PATH — add it to your shell profile" ;;
 	esac
 else
 	warn "Go not found — skipping unimart install"

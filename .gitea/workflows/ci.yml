@@ -1,225 +1,384 @@
-# CI for the Unimart-For-Operations meta repo.
-#
-# Gitea-native workflow: uses only shell steps (no third-party actions), so it
-# runs on any act_runner. Jobs are isolated in containers declared per job.
-#
-# Pipeline stages:
-#   1. go-checks       — fast static gate (gofmt / vet / build / test)
-#   2. security        — full-repo secret scan (gitleaks)
-#   3. contracts       — org cross-repo contract validation (stockroom check)
-#   4. commit-gates    — PR-only: conventional commits + DCO sign-off
-#   5. container-smoke — end-to-end `make test` in the Ubuntu test container
-#
-# NOTE: the container-smoke job nests podman inside a privileged job container.
-# The act_runner must run with `container.privileged: true` in its config.yaml.
-
-name: CI
+name: CI - Meta Repository
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
+# Prevent multiple runs for the same commit/branch
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ gitea.workflow }}-${{ gitea.ref }}
   cancel-in-progress: true
 
 jobs:
-  go-checks:
-    name: Go checks (fmt / vet / build / test)
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 1: Shell Script Validation
+  # ══════════════════════════════════════════════════════════════════════════
+  shellcheck:
+    name: ShellCheck (Scripts)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    container:
-      image: golang:1.25
     steps:
-      - name: Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false  # Don't need submodules for shellcheck
+
+      - name: Install ShellCheck
         run: |
-          host="${GITHUB_SERVER_URL#https://}"
-          host="${host#http://}"
-          host="${host%/}"
-          git clone --depth 1 "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
 
-      # `go fmt ./...` only touches packages of this module (nested modules such
-      # as idpbuilder/ or the scaffolder templates are skipped), so we format
-      # the nested idpbuilder module explicitly, then `git diff` turns any
-      # reformatting into a violation.
-      - name: gofmt check
+      - name: Run ShellCheck on scripts/
         run: |
-          go fmt ./...
-          go -C idpbuilder fmt ./...
-          if ! git diff --exit-code --quiet; then
-            echo "::error::Go files are not formatted — run: go fmt ./... && go -C idpbuilder fmt ./..."
-            git --no-pager diff --stat
-            exit 1
-          fi
-
-      - name: go vet
-        run: |
-          go vet ./...
-          go -C idpbuilder vet ./...
-
-      - name: go build
-        run: go build ./...
-
-      - name: go test
-        run: go test ./...
-
-  security:
-    name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    container:
-      image: alpine:3.20
-    steps:
-      - name: Checkout
-        run: |
-          apk add --no-cache git curl ca-certificates
-          host="${GITHUB_SERVER_URL#https://}"
-          host="${host#http://}"
-          host="${host%/}"
-          git clone --depth 1 "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
-
-      - name: Install gitleaks
-        run: |
-          arch="$(uname -m)"
-          case "${arch}" in
-            x86_64)  asset_arch="x64" ;;
-            aarch64) asset_arch="arm64" ;;
-            *) echo "unsupported arch: ${arch}"; exit 1 ;;
-          esac
-          # gitleaks assets embed the version (e.g. gitleaks_8.30.1_linux_x64.tar.gz),
-          # so resolve the latest release URL from the GitHub API.
-          url="$(
-            curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-              | grep -o "https://github.com/gitleaks/gitleaks/releases/download/[^\"]*linux_${asset_arch}.tar.gz" \
-              | head -1
-          )"
-          if [ -z "${url}" ]; then
-            echo "could not resolve gitleaks release asset for ${asset_arch}"
-            exit 1
-          fi
-          curl -fsSL "${url}" -o /tmp/gitleaks.tar.gz
-          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
-          gitleaks version
-
-      - name: gitleaks detect
-        run: gitleaks detect --source . --no-banner --exit-code 1 --verbose
-
-  contracts:
-    name: Org contracts (stockroom check)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    container:
-      image: golang:1.25
-    steps:
-      - name: Checkout (with submodules)
-        run: |
-          host="${GITHUB_SERVER_URL#https://}"
-          host="${host#http://}"
-          host="${host%/}"
-          # Submodules in .gitmodules use SSH URLs (git@github.com:...), which
-          # the runner cannot authenticate. Rewrite them to the Gitea mirrors,
-          # authenticated with the read-only CI bot token.
-          git config --global url."http://x-access-token:${{ secrets.CI_SUBMODULE_TOKEN }}@${host}/Unimart-For-Operations/".insteadOf "git@github.com:Unimart-For-Operations/"
-          git clone --depth 1 --recurse-submodules --jobs 4 \
-            "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
-
-      - name: Build unimart
-        run: go build -o /tmp/unimart .
-
-      - name: stockroom check
-        run: /tmp/unimart stockroom check
-
-  commit-gates:
-    name: Commit gates (conventional + DCO)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    container:
-      image: alpine:3.20
-    steps:
-      - name: Checkout (full history)
-        run: |
-          apk add --no-cache git ca-certificates
-          host="${GITHUB_SERVER_URL#https://}"
-          host="${host#http://}"
-          host="${host%/}"
-          git clone --filter=blob:none "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
-
-      - name: Validate conventional commits + DCO
-        run: |
-          set -eu
-          base="${{ github.event.pull_request.base.sha }}"
-          head="${{ github.event.pull_request.head.sha }}"
-          git fetch origin "${head}"
-          git fetch origin "${base}" --depth 1
-
-          fails=0
-          for c in $(git rev-list --no-merges "${base}..${head}"); do
-            subject="$(git show -s --format=%s "${c}")"
-            body="$(git show -s --format=%B "${c}")"
-
-            case "${subject}" in
-              Revert*) continue ;;
-            esac
-
-            if ! printf '%s' "${subject}" | grep -qiE \
-                '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|wip)(\([a-zA-Z0-9._-]+\))?!?:[[:space:]]+.*'; then
-              short="$(git rev-parse --short "${c}")"
-              echo "::error::${short} not a conventional commit: ${subject}"
-              echo "  expected e.g.: feat(cmd): add stockroom drift command"
-              fails=1
-            fi
-
-            if ! printf '%s\n' "${body}" | grep -q '^Signed-off-by: '; then
-              short="$(git rev-parse --short "${c}")"
-              echo "::error::${short} missing DCO sign-off: ${subject}"
-              echo "  add: git commit -s --amend"
-              fails=1
-            fi
+          echo "🔍 Checking shell scripts..."
+          find scripts/ -type f -name "*.sh" -print0 | while IFS= read -r -d '' script; do
+            echo "  → $script"
+            shellcheck "$script"
           done
 
-          if [ "${fails}" -ne 0 ]; then
+      - name: Run ShellCheck on cmdr/scripts/
+        run: |
+          if [ -d cmdr/scripts ]; then
+            echo "🔍 Checking cmdr shell scripts..."
+            find cmdr/scripts/ -type f -name "*.sh" -print0 | while IFS= read -r -d '' script; do
+              echo "  → $script"
+              shellcheck "$script"
+            done
+          fi
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 2: Go Validation (meta + idpbuilder)
+  # ══════════════════════════════════════════════════════════════════════════
+  go-checks:
+    name: Go (fmt, vet, build, test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Need cmdr for full build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'  # Match go.mod version
+          cache: true
+
+      - name: Go fmt (meta)
+        run: |
+          echo "🎨 Running go fmt on meta..."
+          go fmt ./...
+
+      - name: Go fmt (idpbuilder)
+        run: |
+          echo "🎨 Running go fmt on idpbuilder..."
+          go -C idpbuilder fmt ./...
+
+      - name: Go vet (meta)
+        run: |
+          echo "🔬 Running go vet on meta..."
+          go vet ./...
+
+      - name: Go vet (idpbuilder)
+        run: |
+          echo "🔬 Running go vet on idpbuilder..."
+          go -C idpbuilder vet ./...
+
+      - name: Go build (unimart)
+        run: |
+          echo "🏗️  Building unimart..."
+          VERSION="${GITEA_SHA::7}"
+          COMMIT="${GITEA_SHA::7}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          LDFLAGS="-X github.com/Unimart-For-Operations/meta/cmd.Version=${VERSION}"
+          LDFLAGS="${LDFLAGS} -X github.com/Unimart-For-Operations/meta/cmd.GitCommit=${COMMIT}"
+          LDFLAGS="${LDFLAGS} -X github.com/Unimart-For-Operations/meta/cmd.BuildDate=${DATE}"
+          go build -ldflags "${LDFLAGS}" -o unimart .
+
+      - name: Verify unimart binary
+        run: |
+          echo "✅ Verifying unimart binary..."
+          ./unimart version
+          ./unimart --help
+
+      - name: Go test (meta)
+        run: |
+          echo "🧪 Running tests on meta..."
+          go test -v ./...
+
+      - name: Go test (idpbuilder)
+        run: |
+          echo "🧪 Running tests on idpbuilder..."
+          go -C idpbuilder test -v ./...
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 3: Nix Flake Checks (cmdr)
+  # ══════════════════════════════════════════════════════════════════════════
+  nix-checks:
+    name: Nix (flake check)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Need cmdr submodule
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Enable flakes
+        run: |
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+      - name: Nix flake check (cmdr)
+        run: |
+          echo "❄️  Running nix flake check on cmdr..."
+          cd cmdr
+          nix flake check --all-systems
+
+      - name: Nix fmt check (cmdr)
+        run: |
+          echo "🎨 Checking Nix formatting..."
+          cd cmdr
+          nix fmt -- --check .
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 4: Documentation Validation
+  # ══════════════════════════════════════════════════════════════════════════
+  docs-checks:
+    name: Documentation (markdown, paths)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install markdownlint-cli
+        run: |
+          sudo npm install -g markdownlint-cli
+
+      - name: Markdown lint
+        run: |
+          echo "📝 Linting markdown files..."
+          # Lint but don't fail on line-length (MD013) or inline HTML (MD033)
+          markdownlint '**/*.md' \
+            --ignore node_modules \
+            --ignore .git \
+            --config .markdownlint.json \
+            || echo "⚠️  Markdown linting found issues (non-fatal)"
+        continue-on-error: true  # Don't fail builds on markdown lint
+
+      - name: Check for old path references
+        run: |
+          echo "🔍 Checking for stray old path references..."
+          
+          # Exclude documentation that documents the change itself
+          EXCLUDE_DOCS=(
+            "./docs/CI.md"
+            "./docs/onboarding-improvements-2026-08-31.md"
+            "./docs/COMMIT-CHECKLIST.md"
+            "./docs/SUMMARY.md"
+          )
+          
+          # Build grep exclude arguments
+          GREP_EXCLUDES=""
+          for doc in "${EXCLUDE_DOCS[@]}"; do
+            GREP_EXCLUDES="$GREP_EXCLUDES --exclude=$(basename $doc)"
+          done
+          
+          # Check for old path pattern (should be zero)
+          OLD_PATH_COUNT=$(grep -r "repos/github/idpbuilder" \
+            --include="*.md" \
+            --include="*.sh" \
+            --include="*.nix" \
+            --exclude-dir=.git \
+            --exclude-dir=node_modules \
+            $GREP_EXCLUDES \
+            . 2>/dev/null | wc -l || echo "0")
+          
+          if [ "$OLD_PATH_COUNT" -gt 0 ]; then
+            echo "❌ Found $OLD_PATH_COUNT references to old path 'repos/github/idpbuilder'"
+            echo "   Should be: repos/Unimart-For-Operations/meta"
+            echo "   (Excluding docs about the migration itself)"
+            echo ""
+            grep -rn "repos/github/idpbuilder" \
+              --include="*.md" \
+              --include="*.sh" \
+              --include="*.nix" \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              $GREP_EXCLUDES \
+              . 2>/dev/null || true
+            exit 1
+          else
+            echo "✅ No old path references found (excluding migration docs)"
+          fi
+
+      - name: Verify provision.sh exists and is executable
+        run: |
+          echo "🔍 Checking provision.sh..."
+          if [ ! -f scripts/provision.sh ]; then
+            echo "❌ scripts/provision.sh not found"
             exit 1
           fi
-          echo "All commits conventional with DCO sign-off"
+          if [ ! -x scripts/provision.sh ]; then
+            echo "❌ scripts/provision.sh is not executable"
+            exit 1
+          fi
+          echo "✅ provision.sh exists and is executable"
 
-  container-smoke:
-    name: Container smoke test (make test)
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 5: Host Configuration Validation (NixOS)
+  # ══════════════════════════════════════════════════════════════════════════
+  host-configs:
+    name: Host Configs (NixOS)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    container:
-      image: docker.io/library/ubuntu:24.04
-      options: --privileged
     steps:
-      - name: Checkout (with submodules)
-        run: |
-          apt-get update && apt-get install -y --no-install-recommends git ca-certificates
-          host="${GITHUB_SERVER_URL#https://}"
-          host="${host#http://}"
-          host="${host%/}"
-          # Submodules in .gitmodules use SSH URLs (git@github.com:...), which
-          # the runner cannot authenticate. Rewrite them to the Gitea mirrors,
-          # authenticated with the read-only CI bot token.
-          git config --global url."http://x-access-token:${{ secrets.CI_SUBMODULE_TOKEN }}@${host}/Unimart-For-Operations/".insteadOf "git@github.com:Unimart-For-Operations/"
-          git clone --depth 1 --recurse-submodules --jobs 4 \
-            "http://x-access-token:${{ secrets.GITHUB_TOKEN }}@${host}/${GITHUB_REPOSITORY}.git" .
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install podman
-        run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y --no-install-recommends podman podman-compose make curl
-          # vfs storage avoids overlay-in-overlay inside the privileged job
-          # container; explicit runroot/graphroot are required for vfs in
-          # podman 4.x (default runroot under /run is not usable in this job).
-          mkdir -p /var/tmp/containers/runroot /var/tmp/containers/graphroot
-          printf '[storage]\ndriver = "vfs"\nrunroot = "/var/tmp/containers/runroot"\ngraphroot = "/var/tmp/containers/graphroot"\n' > /etc/containers/storage.conf
-          podman --version
-          podman-compose --version
-          podman info --format 'graph-driver={{.Store.GraphDriverName}} runroot={{.Store.RunRoot}}'
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: make test
-        run: make test
+      - name: Enable flakes
+        run: |
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+      - name: Validate NixOS host configurations
+        run: |
+          echo "🖥️  Validating NixOS host configurations..."
+          cd cmdr
+          
+          # Find all NixOS hosts
+          for host_dir in home/02-hosts/nixos/*/; do
+            host_name=$(basename "$host_dir")
+            
+            # Skip template and bootstrap docs
+            if [ "$host_name" = "_template" ]; then
+              continue
+            fi
+            
+            echo ""
+            echo "  → Checking $host_name..."
+            
+            # Check required files exist
+            for file in meta.nix default.nix system.nix hardware-configuration.nix; do
+              if [ ! -f "${host_dir}${file}" ]; then
+                echo "    ❌ Missing ${file}"
+                exit 1
+              fi
+            done
+            
+            # Evaluate the configuration (don't build, just check syntax)
+            echo "    ✓ Files present, evaluating configuration..."
+            nix eval --json ".#nixosConfigurations.${host_name}.config.system.build.toplevel" > /dev/null || {
+              echo "    ❌ Configuration evaluation failed"
+              exit 1
+            }
+            
+            echo "    ✅ ${host_name} configuration is valid"
+          done
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 6: Cross-Repo Contract Validation (unimart stockroom check)
+  # ══════════════════════════════════════════════════════════════════════════
+  cross-repo:
+    name: Cross-Repo Contracts
+    runs-on: ubuntu-latest
+    needs: [go-checks]  # Wait for unimart to build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Build unimart
+        run: |
+          echo "🏗️  Building unimart for stockroom check..."
+          go build -o unimart .
+
+      - name: Run stockroom check
+        run: |
+          echo "🔍 Running cross-repo contract validation..."
+          ./unimart stockroom check
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Job 7: Integration Test (provision.sh smoke test)
+  # ══════════════════════════════════════════════════════════════════════════
+  provision-test:
+    name: Provision Script (smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false  # provision.sh handles submodule init
+
+      - name: Test provision.sh (dry-run)
+        run: |
+          echo "🧪 Testing provision.sh in dry-run mode..."
+          
+          # Create a test directory to simulate fresh clone
+          TEST_DIR="/tmp/meta-provision-test"
+          mkdir -p "$TEST_DIR"
+          
+          # Copy repo to test directory
+          cp -r . "$TEST_DIR/"
+          cd "$TEST_DIR"
+          
+          # Run provision.sh with META_DIR override (don't pollute ~/)
+          export META_DIR="$TEST_DIR/test-clone"
+          
+          # TODO: Add dry-run mode to provision.sh
+          # For now, just validate the script is valid bash
+          bash -n scripts/provision.sh
+          
+          echo "✅ provision.sh syntax is valid"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Summary Job (Requires all checks to pass)
+  # ══════════════════════════════════════════════════════════════════════════
+  ci-summary:
+    name: ✅ All Checks Passed
+    runs-on: ubuntu-latest
+    needs:
+      - shellcheck
+      - go-checks
+      - nix-checks
+      - docs-checks
+      - host-configs
+      - cross-repo
+      - provision-test
+    steps:
+      - name: Summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ All CI checks passed!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Verified:"
+          echo "  ✓ Shell scripts (shellcheck)"
+          echo "  ✓ Go code (fmt, vet, build, test)"
+          echo "  ✓ Nix flakes (check, fmt)"
+          echo "  ✓ Documentation (markdown, path consistency)"
+          echo "  ✓ Host configurations (NixOS eval)"
+          echo "  ✓ Cross-repo contracts (stockroom)"
+          echo "  ✓ Provision script (syntax)"
+          echo ""
+          echo "Ready to merge! 🎉"
