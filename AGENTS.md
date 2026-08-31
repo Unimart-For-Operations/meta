@@ -128,7 +128,7 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 ## Key Paths
 
 ```
-~/repos/github/idpbuilder/              This directory (meta repo)
+~/repos/Unimart-For-Operations/meta/    This directory (meta repo)
 ├── AGENTS.md                            This file
 ├── main.go                              CLI entry point
 ├── go.mod / go.sum                      Go module
