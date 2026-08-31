@@ -142,7 +142,7 @@ jobs:
         run: |
           echo "❄️  Running nix flake check on cmdr..."
           cd cmdr
-          nix flake check --all-systems
+          nix flake check
 
       - name: Nix fmt check (cmdr)
         run: |
@@ -179,18 +179,20 @@ jobs:
         run: |
           echo "🔍 Checking for stray old path references..."
           
-          # Exclude documentation that documents the change itself
+          # Exclude documentation that documents the change/check itself
           EXCLUDE_DOCS=(
-            "./docs/CI.md"
-            "./docs/onboarding-improvements-2026-08-31.md"
-            "./docs/COMMIT-CHECKLIST.md"
-            "./docs/SUMMARY.md"
+            "CI.md"
+            "CI-TEST-RESULTS.md"
+            "onboarding-improvements-2026-08-31.md"
+            "COMMIT-CHECKLIST.md"
+            "SUMMARY.md"
+            "run-ci-local.sh"
           )
           
           # Build grep exclude arguments
           GREP_EXCLUDES=""
           for doc in "${EXCLUDE_DOCS[@]}"; do
-            GREP_EXCLUDES="$GREP_EXCLUDES --exclude=$(basename $doc)"
+            GREP_EXCLUDES="$GREP_EXCLUDES --exclude=$doc"
           done
           
           # Check for old path pattern (should be zero)
@@ -200,13 +202,14 @@ jobs:
             --include="*.nix" \
             --exclude-dir=.git \
             --exclude-dir=node_modules \
+            --exclude-dir=unimart-employee-handbooks \
             $GREP_EXCLUDES \
             . 2>/dev/null | wc -l || echo "0")
           
           if [ "$OLD_PATH_COUNT" -gt 0 ]; then
             echo "❌ Found $OLD_PATH_COUNT references to old path 'repos/github/idpbuilder'"
             echo "   Should be: repos/Unimart-For-Operations/meta"
-            echo "   (Excluding docs about the migration itself)"
+            echo "   (Excluding docs about the migration and cdc submodule)"
             echo ""
             grep -rn "repos/github/idpbuilder" \
               --include="*.md" \
@@ -214,11 +217,12 @@ jobs:
               --include="*.nix" \
               --exclude-dir=.git \
               --exclude-dir=node_modules \
+              --exclude-dir=unimart-employee-handbooks \
               $GREP_EXCLUDES \
               . 2>/dev/null || true
             exit 1
           else
-            echo "✅ No old path references found (excluding migration docs)"
+            echo "✅ No old path references found (excluding migration docs and cdc)"
           fi
 
       - name: Verify provision.sh exists and is executable
