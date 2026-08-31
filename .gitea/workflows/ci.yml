@@ -8,7 +8,7 @@ on:
 
 # Prevent multiple runs for the same commit/branch
 concurrency:
-  group: ${{ gitea.workflow }}-${{ gitea.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive  # Need cmdr for full build
+          submodules: false  # idpbuilder is tracked, not a submodule
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -122,7 +122,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive  # Need cmdr submodule
+          submodules: false  # Will init manually with HTTPS URLs
+      
+      - name: Initialize submodules with HTTPS
+        run: |
+          echo "🔗 Converting submodule URLs to HTTPS for CI..."
+          git config --file=.gitmodules submodule.cmdr.url https://github.com/Unimart-For-Operations/cmdr.git
+          git config --file=.gitmodules submodule.unimart-employee-handbooks/cdc.url https://github.com/idpbuilder/cdc.git
+          git submodule sync
+          git submodule update --init --recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v26
@@ -156,7 +164,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # Don't need submodules for doc checks
 
       - name: Install markdownlint-cli
         run: |
@@ -242,7 +250,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # Will init manually with HTTPS URLs
+      
+      - name: Initialize submodules with HTTPS
+        run: |
+          echo "🔗 Converting submodule URLs to HTTPS for CI..."
+          git config --file=.gitmodules submodule.cmdr.url https://github.com/Unimart-For-Operations/cmdr.git
+          git config --file=.gitmodules submodule.unimart-employee-handbooks/cdc.url https://github.com/idpbuilder/cdc.git
+          git submodule sync
+          git submodule update --init --recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v26
@@ -300,7 +316,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # Will init manually with HTTPS URLs
+      
+      - name: Initialize submodules with HTTPS
+        run: |
+          echo "🔗 Converting submodule URLs to HTTPS for CI..."
+          git config --file=.gitmodules submodule.cmdr.url https://github.com/Unimart-For-Operations/cmdr.git
+          git config --file=.gitmodules submodule.unimart-employee-handbooks/cdc.url https://github.com/idpbuilder/cdc.git
+          git submodule sync
+          git submodule update --init --recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
