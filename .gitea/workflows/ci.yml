@@ -137,14 +137,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install markdownlint-cli
-        run: |
-          sudo npm install -g markdownlint-cli
+        run: npm install -g markdownlint-cli
 
       - name: Markdown lint
         run: |
           echo "📝 Linting markdown files..."
-          # Lint but don't fail on line-length (MD013) or inline HTML (MD033)
           markdownlint '**/*.md' \
             --ignore node_modules \
             --ignore .git \
