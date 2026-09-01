@@ -7,7 +7,7 @@ See [TOOLING.md](TOOLING.md) for the boundary between `unimart`, Make, CI, and s
 ## Quick Start
 
 ```bash
-git clone --recurse-submodules git@github.com:Unimart-For-Operations/meta.git
+git clone --recurse-submodules https://github.com/Unimart-For-Operations/meta.git
 cd meta
 go run . deli doctor
 ```
@@ -121,10 +121,10 @@ The repo-level Makefile no longer owns onboarding or org-wide orchestration. It 
 | Submodule | Purpose | Language |
 |-----------|---------|----------|
 | [cmdr](cmdr/) | Nix flake + Home Manager workstation config | Nix |
-| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder (private fork of cnoe-io/idpbuilder) | Go |
+| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder (independent downstream of cnoe-io/idpbuilder) | Go |
 | [idpctl](idpctl/) | CLI lifecycle tool for idpbuilder (deprecated — absorbed into unimart) | Go |
 | [docs](docs/) | Documentation aggregation hub (transitional — being replaced by cdc) | Shell/Markdown |
-| [cdc](unimart-employee-handbooks/cdc/) | Obsidian vault — synced doc mirrors + org knowledge base (github.com/idpbuilder/cdc) | Markdown |
+| [cdc](unimart-employee-handbooks/cdc/) | Obsidian vault — synced doc mirrors + org knowledge base | Markdown |
 
 ## Install Methods
 
@@ -156,7 +156,7 @@ make tag          Create org snapshot tag (VERSION=v0.x.0)
 
 ## Conventions
 
-- **Private repos only** — all org repos are private on GitHub
+- **Public onboarding sources** — meta and its submodules clone anonymously over HTTPS
 - **Nix-first** — system managed via nix-darwin + home-manager (cmdr)
 - **DCO sign-off** — all commits require `git commit -s`
 - **Conventional commits** — `feat(scope):`, `fix:`, `docs:`, `refactor:`

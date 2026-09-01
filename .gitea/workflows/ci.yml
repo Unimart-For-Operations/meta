@@ -12,13 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUBMODULE INIT PATTERN (used in jobs that need cmdr submodule)
+# SUBMODULE CHECKOUT
 # ══════════════════════════════════════════════════════════════════════════════
-# - name: Initialize submodules with HTTPS
-#   run: |
-#     git config --file=.gitmodules submodule.cmdr.url https://github.com/Unimart-For-Operations/cmdr.git
-#     git submodule sync
-#     git submodule update --init cmdr
+# Public HTTPS submodules are checked out recursively by every job.
 # ══════════════════════════════════════════════════════════════════════════════
 
 jobs:
@@ -31,6 +27,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install ShellCheck
         run: |
@@ -56,6 +54,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -136,6 +136,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -262,6 +264,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Test provision.sh (dry-run)
         run: |

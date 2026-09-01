@@ -40,7 +40,10 @@ func runBootstrap(cmd *cobra.Command, args []string) error {
 	// [1/5] Submodules
 	fmt.Printf("\n%s [1/5] Initializing submodules\n", bold("▸"))
 	flakeNix := filepath.Join(cmdrDir, "flake.nix")
-	if _, err := os.Stat(flakeNix); err == nil {
+	idpbuilderGoMod := filepath.Join(dir, "idpbuilder", "go.mod")
+	_, flakeErr := os.Stat(flakeNix)
+	_, idpbuilderErr := os.Stat(idpbuilderGoMod)
+	if flakeErr == nil && idpbuilderErr == nil {
 		fmt.Printf("  %s Submodules already initialized\n", pass("[ok]"))
 	} else {
 		fmt.Println("  Running git submodule update --init --recursive...")

@@ -1,6 +1,6 @@
 # idpbuilder Organization
 
-This is the meta coordination repo and unified CLI (`unimart`) for the [Unimart-For-Operations](https://github.com/Unimart-For-Operations) GitHub organization. `cmdr` is tracked as a git submodule (`ignore = dirty`); `idpbuilder` is absorbed in-tree as a tracked directory.
+This is the meta coordination repo and unified CLI (`unimart`) for the [Unimart-For-Operations](https://github.com/Unimart-For-Operations) GitHub organization. `cmdr`, `idpbuilder`, and CDC are public Git submodules.
 
 ## unimart CLI
 
@@ -37,8 +37,8 @@ Source layout:
 - `internal/repos/` — org repo discovery and Gitea publish
 - `internal/theme/` — theme loading, k9s skin and tmux status generation
 
-idpbuilder is absorbed into this repo as a tracked directory (`idpbuilder/`, a
-nested Go module `github.com/cnoe-io/idpbuilder`) and compiled directly into the
+idpbuilder is pinned as a submodule at `idpbuilder/` (a nested Go module named
+`github.com/cnoe-io/idpbuilder`) and compiled directly into the
 unimart binary via `replace github.com/cnoe-io/idpbuilder => ./idpbuilder` in
 `go.mod`. There is no separate idpbuilder binary build step; `open`/`reload`/
 `freezer up` run idpbuilder's create engine in-process (`internal/idp`), and
@@ -51,8 +51,8 @@ idpbuilder flags via the curated flags on those commands, plus a `--` passthroug
 |------|---------|----------|--------|
 | [cmdr](cmdr/) | Nix flake + Home Manager workstation config | Nix | Active |
 | [docs-service](docs-service/) | Phoenix microservice serving org docs from Gitea (deployed via `unimart freezer docs up`, not `unimart open`) | Elixir | Active |
-| [cdc](unimart-employee-handbooks/cdc/) | Obsidian vault — synced doc mirrors + org knowledge base (hosted at `github.com/idpbuilder/cdc`) | Markdown | Active |
-| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder, absorbed in-tree as a nested Go module (fork of cnoe-io/idpbuilder) | Go | Active |
+| [cdc](unimart-employee-handbooks/cdc/) | Obsidian vault — synced doc mirrors + org knowledge base | Markdown | Active |
+| [idpbuilder](idpbuilder/) | Kubernetes-based IDP builder, independent downstream of cnoe-io/idpbuilder | Go | Active |
 
 ## Distribution
 
@@ -66,7 +66,7 @@ unimart is distributed through three channels:
 
 ### Nix distribution details
 
-The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's flake references it as a flake input (`meta.url = "git+ssh://git@github.com/Unimart-For-Operations/meta.git"` — uses git+ssh:// for private repos, not github: which would require a token). The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
+The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr fetches the public meta repository with `submodules=1` because the build compiles idpbuilder in-process. The unimart module at `cmdr/home/04-modules/cli/graduated/unimart/default.nix` pulls the package into `home.packages`. Any host with `features = ["cli" ...]` gets unimart automatically.
 
 **Note on cli sub-features:** The `cli` feature is a convenience bundle that imports `cli-core`, `cli-languages`, `cli-containers`, `cli-devops`, and `cli-org`. The `_template/meta.nix` documents these sub-features, but they are not registered in the feature engine's `featureModules` map — only the bundle `cli` is usable as a top-level feature. To use individual components, compose them manually or use the bundle.
 
@@ -78,10 +78,10 @@ The meta flake exposes `packages.<system>.unimart` via `buildGoModule`. cmdr's f
 
 - **Nix-first**: The user's system is Nix-managed (nix-darwin + home-manager via cmdr). All CLI tooling via Nix. Homebrew only for Colima on macOS.
 - **DCO sign-off**: All repos require `git commit -s` for Developer Certificate of Origin.
-- **Git submodules**: `cmdr` (`ignore = dirty`) and `unimart-employee-handbooks/cdc` (Obsidian vault, hosted at `github.com/idpbuilder/cdc`) are the active submodules; `idpbuilder` is a tracked directory. Use `unimart deli bootstrap` or `go run . deli bootstrap` for first-time init.
+- **Git submodules**: `cmdr`, `idpbuilder`, and `unimart-employee-handbooks/cdc` are public HTTPS submodules. Use `unimart deli bootstrap` or `go run . deli bootstrap` for first-time initialization.
 - **Commit style**: Conventional commits — `feat(scope):`, `fix:`, `docs:`, `refactor:`.
 - **Makefile convention**: All repos use a consistent Makefile style — color output, `.DEFAULT_GOAL := help`, hand-crafted sectioned help, `@`-silenced commands, `## description` comments, `[pass]/[fail]/[warn]` status indicators. After `unimart` is installed, Make targets delegate to it.
-- **Upstream sync**: cnoe-io/idpbuilder changes are cherry-picked, not merged. The `upstream` remote (`git@github.com:cnoe-io/idpbuilder.git`) and the `fetch-upstream` / `upstream-status` / `log-upstream` / `log-upstream-detail` / `diff-upstream` / `cherry-pick COMMIT=<sha>` targets live in the **meta** Makefile. idpbuilder's history in this repo is flat (one absorb commit), so an ancestry-based diff is impossible — compare via `HEAD:idpbuilder ↔ upstream/main` tree diff and apply with `git apply --directory=idpbuilder/`. Load the `upstream-mgmt` skill for the workflow.
+- **Upstream sync**: `cnoe-io/idpbuilder` is configured inside the idpbuilder submodule as a fetch-only `upstream`. Changes are cherry-picked, never merged, then pushed to the Unimart GitHub origin and Gitea mirror. Root Make targets delegate to the submodule. Load the `upstream-mgmt` skill for the workflow.
 
 ## Development
 
@@ -190,18 +190,17 @@ All hooks are Nix-managed via `cmdr/home/04-modules/cli/graduated/git/default.ni
 ├── cmdr/                                Nix workstation config (submodule)
 ├── docs-service/                        Phoenix docs microservice (submodule pending; see repositories/)
 ├── unimart-employee-handbooks/cdc/      Obsidian vault / synced doc mirrors (submodule)
-└── idpbuilder/                          IDP builder (tracked directory, nested Go module)
+└── idpbuilder/                          IDP builder (submodule, nested Go module)
 ```
 
 >
-> **Note**: `idpbuilder` is no longer a submodule — it was absorbed into this repo as a tracked directory (see above). `docs-service` is pending submodule registration. Active submodules in `.gitmodules`: `cmdr` and `unimart-employee-handbooks/cdc`.
+> **Note**: Active submodules in `.gitmodules` are `cmdr`, `idpbuilder`, and `unimart-employee-handbooks/cdc`. `docs-service` is pending repository registration.
 
 ## Working in This Directory
 
 This is the org coordination hub. Component repos are managed as follows:
 
-- **Submodules** (`cmdr`, `unimart-employee-handbooks/cdc`): Git submodules with `ignore = dirty` where applicable. Each has its own `AGENTS.md`.
-- **Tracked directories** (`idpbuilder`): Absorbed in-tree, not submodules. Has its own `AGENTS.md`.
+- **Submodules** (`cmdr`, `idpbuilder`, `unimart-employee-handbooks/cdc`): Public Git submodules with independent histories. Each has its own `AGENTS.md`.
 - **Standalone** (`docs-service`): Tracked directory, pending submodule conversion. Has its own `AGENTS.md`.
 
 When working across repos, read the target repo's `AGENTS.md` first — it has repo-specific architecture, build/test commands, and conventions.

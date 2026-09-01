@@ -100,8 +100,16 @@ else
 	cd "$CLONE_DIR"
 fi
 
-# ── [3/6] Install Prerequisites ───────────────────────────────────────
-step "[3/6] Installing prerequisites"
+# ── [3/6] Initialize Submodules ───────────────────────────────────────
+step "[3/6] Initializing submodules"
+
+info "Synchronizing and initializing public submodules..."
+git submodule sync --recursive
+git submodule update --init --recursive
+ok "Submodules initialized"
+
+# ── [4/6] Install Prerequisites ───────────────────────────────────────
+step "[4/6] Installing prerequisites"
 
 BOOTSTRAP_SCRIPT="$CLONE_DIR/cmdr/scripts/bootstrap.sh"
 if [[ ! -f "$BOOTSTRAP_SCRIPT" ]]; then
@@ -110,8 +118,8 @@ fi
 
 bash "$BOOTSTRAP_SCRIPT"
 
-# ── [4/6] Verify Nix ──────────────────────────────────────────────────
-step "[4/6] Verifying Nix installation"
+# ── [5/6] Verify Nix ──────────────────────────────────────────────────
+step "[5/6] Verifying Nix installation"
 
 # Source Nix profile if not already in PATH
 if ! command -v nix &>/dev/null; then
@@ -136,17 +144,6 @@ else
 	echo "    exec zsh"
 	echo "    curl -fsSL https://raw.githubusercontent.com/Unimart-For-Operations/meta/main/scripts/provision.sh | bash"
 	exit 0
-fi
-
-# ── [5/6] Initialize Submodules ───────────────────────────────────────
-step "[5/6] Initializing submodules"
-
-if [[ -f "$CLONE_DIR/cmdr/flake.nix" ]]; then
-	ok "Submodules already initialized"
-else
-	info "Running git submodule update --init --recursive..."
-	git submodule update --init --recursive
-	ok "Submodules initialized"
 fi
 
 # ── [6/6] Bootstrap via unimart ───────────────────────────────────────

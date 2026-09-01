@@ -75,7 +75,7 @@ func buildHostPlan(h host.Info) hostPlan {
 		{
 			Title: "Phase 2 — Clone Control Plane",
 			Items: []string{
-				"git clone --recurse-submodules git@github.com:Unimart-For-Operations/meta.git",
+				"git clone --recurse-submodules https://github.com/Unimart-For-Operations/meta.git",
 				"cd meta",
 				"make init",
 			},

@@ -9,17 +9,10 @@ import (
 func TestResolveOrgDir(t *testing.T) {
 	// Create a temp directory that looks like an org dir
 	tmpDir := t.TempDir()
-	cmdrDir := filepath.Join(tmpDir, "cmdr")
-	if err := os.MkdirAll(cmdrDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// Create .gitmodules
-	if err := os.WriteFile(filepath.Join(tmpDir, ".gitmodules"), []byte("[submodule]"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// Create cmdr/flake.nix
-	if err := os.WriteFile(filepath.Join(cmdrDir, "flake.nix"), []byte("{}"), 0o644); err != nil {
-		t.Fatal(err)
+	for _, marker := range []string{".gitmodules", "go.mod", "flake.nix"} {
+		if err := os.WriteFile(filepath.Join(tmpDir, marker), []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	t.Run("via flag", func(t *testing.T) {
@@ -89,17 +82,15 @@ func TestIsOrgDir(t *testing.T) {
 		t.Error("empty dir should not be detected as org dir")
 	}
 
-	// Add .gitmodules but no cmdr/flake.nix
+	// A partial marker set is not sufficient.
 	os.WriteFile(filepath.Join(tmpDir, ".gitmodules"), []byte("[submodule]"), 0o644)
 	if isOrgDir(tmpDir) {
 		t.Error("dir with only .gitmodules should not be detected as org dir")
 	}
 
-	// Add cmdr/flake.nix
-	cmdrDir := filepath.Join(tmpDir, "cmdr")
-	os.MkdirAll(cmdrDir, 0o755)
-	os.WriteFile(filepath.Join(cmdrDir, "flake.nix"), []byte("{}"), 0o644)
+	os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example"), 0o644)
+	os.WriteFile(filepath.Join(tmpDir, "flake.nix"), []byte("{}"), 0o644)
 	if !isOrgDir(tmpDir) {
-		t.Error("dir with .gitmodules and cmdr/flake.nix should be detected as org dir")
+		t.Error("dir with all meta repository markers should be detected as org dir")
 	}
 }

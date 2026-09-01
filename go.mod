@@ -8,8 +8,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 )
 
-// idpbuilder is absorbed into this repo as a tracked directory at ./idpbuilder
-// (module github.com/cnoe-io/idpbuilder) and compiled into the unimart binary.
+// idpbuilder is pinned as a submodule at ./idpbuilder and compiled into unimart.
 replace github.com/cnoe-io/idpbuilder => ./idpbuilder
 
 require (

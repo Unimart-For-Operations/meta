@@ -9,24 +9,13 @@ import (
 // gitmodulesContent is a realistic .gitmodules matching the org repo.
 const gitmodulesContent = `[submodule "cmdr"]
 	path = cmdr
-	url = git@github.com:Unimart-For-Operations/cmdr.git
-	ignore = dirty
+	url = https://github.com/Unimart-For-Operations/cmdr.git
 [submodule "idpbuilder"]
 	path = idpbuilder
-	url = git@github.com:Unimart-For-Operations/idpbuilder.git
-	ignore = dirty
-[submodule "idpctl"]
-	path = idpctl
-	url = git@github.com:Unimart-For-Operations/idpctl.git
-	ignore = dirty
-[submodule "docs"]
-	path = docs
-	url = git@github.com:Unimart-For-Operations/docs.git
-	ignore = dirty
+	url = https://github.com/Unimart-For-Operations/idpbuilder.git
 [submodule "unimart-employee-handbooks/cdc"]
 	path = unimart-employee-handbooks/cdc
-	url = git@github.com:idpbuilder/cdc.git
-	ignore = dirty
+	url = https://github.com/Unimart-For-Operations/cdc.git
 `
 
 func TestParseGitmodules(t *testing.T) {
@@ -40,19 +29,17 @@ func TestParseGitmodules(t *testing.T) {
 		t.Fatalf("ParseGitmodules: %v", err)
 	}
 
-	if len(subs) != 5 {
-		t.Fatalf("expected 5 submodules, got %d", len(subs))
+	if len(subs) != 3 {
+		t.Fatalf("expected 3 submodules, got %d", len(subs))
 	}
 
 	// Verify each entry
 	expected := []struct {
 		name, path, url string
 	}{
-		{"cmdr", "cmdr", "git@github.com:Unimart-For-Operations/cmdr.git"},
-		{"idpbuilder", "idpbuilder", "git@github.com:Unimart-For-Operations/idpbuilder.git"},
-		{"idpctl", "idpctl", "git@github.com:Unimart-For-Operations/idpctl.git"},
-		{"docs", "docs", "git@github.com:Unimart-For-Operations/docs.git"},
-		{"unimart-employee-handbooks/cdc", "unimart-employee-handbooks/cdc", "git@github.com:idpbuilder/cdc.git"},
+		{"cmdr", "cmdr", "https://github.com/Unimart-For-Operations/cmdr.git"},
+		{"idpbuilder", "idpbuilder", "https://github.com/Unimart-For-Operations/idpbuilder.git"},
+		{"unimart-employee-handbooks/cdc", "unimart-employee-handbooks/cdc", "https://github.com/Unimart-For-Operations/cdc.git"},
 	}
 
 	for i, e := range expected {

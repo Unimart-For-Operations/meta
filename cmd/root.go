@@ -135,19 +135,17 @@ func resolveOrgDir() (string, error) {
 		dir = parent
 	}
 
-	return "", fmt.Errorf("could not detect org directory (no .gitmodules with cmdr submodule found)\nUse --org-dir or set UNIMART_ORG_DIR")
+	return "", fmt.Errorf("could not detect org directory (meta repository markers not found)\nUse --org-dir or set UNIMART_ORG_DIR")
 }
 
 // isOrgDir checks if a directory looks like the meta repo root.
 func isOrgDir(dir string) bool {
-	// Must have .gitmodules and cmdr/ submodule
-	gitmodules := filepath.Join(dir, ".gitmodules")
-	if _, err := os.Stat(gitmodules); err != nil {
-		return false
-	}
-	cmdrDir := filepath.Join(dir, "cmdr", "flake.nix")
-	if _, err := os.Stat(cmdrDir); err != nil {
-		return false
+	// Use files present in the initial clone so bootstrap can initialize an
+	// otherwise empty submodule checkout.
+	for _, marker := range []string{".gitmodules", "go.mod", "flake.nix"} {
+		if _, err := os.Stat(filepath.Join(dir, marker)); err != nil {
+			return false
+		}
 	}
 	return true
 }

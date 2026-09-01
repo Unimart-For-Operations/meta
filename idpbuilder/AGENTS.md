@@ -1,1 +1,0 @@
-docs/Contributing/AGENTS.md
